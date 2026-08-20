@@ -1,0 +1,27 @@
+# Empaquetado Overrun — Windows + Linux, SIN firma (D-010 / D-022).
+# macOS deliberadamente ausente (Gatekeeper exige notarización paga).
+appId: com.overrun.app
+productName: Overrun
+
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - out/**
+
+# Windows: instalador NSIS. Sin firma → SmartScreen mostrará warning saltable.
+win:
+  target:
+    - nsis
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+
+# Linux: AppImage (archivo único portable, sin gate de firma).
+linux:
+  target:
+    - AppImage
+  category: Development
+
+publish: null

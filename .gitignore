@@ -1,0 +1,15 @@
+# dependencias / build
+node_modules/
+out/
+dist/
+
+# TypeScript incremental
+*.tsbuildinfo
+
+# artefacto de diseño generado (regenerable con seed-canvas.mjs desde los .dc.html)
+design/runtime-browser-concept.html
+
+# logs / OS
+*.log
+.DS_Store
+Thumbs.db
