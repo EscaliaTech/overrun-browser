@@ -2,6 +2,7 @@ import type { WebContents } from 'electron'
 import { handleCdpNetwork, resetNetwork } from '../events/network'
 import { handleCdpConsole } from '../events/console'
 import { createMemoryPoller } from '../events/memory'
+import { createPerformancePoller } from '../events/performance'
 
 // ============================================================================
 // Capa CDP (D-002) — DESACOPLADA de la base (REQ-062): si mañana se migra a
@@ -32,19 +33,23 @@ export function attachCdp(page: WebContents): void {
   })
 
   const memory = createMemoryPoller(dbg)
+  const performance = createPerformancePoller(dbg)
 
   dbg.on('detach', (_event, reason) => {
     console.warn('[cdp] debugger detached:', reason)
     memory.stop()
+    performance.stop()
   })
 
-  // Dominios habilitados: Network (D-015) + Runtime/Log para consola (REQ-021).
+  // Dominios habilitados: Network (D-015) + Runtime/Log (REQ-021) + Performance (REQ-023).
   dbg.sendCommand('Network.enable').catch((e) => console.error('[cdp] Network.enable', e))
   dbg.sendCommand('Runtime.enable').catch((e) => console.error('[cdp] Runtime.enable', e))
   dbg.sendCommand('Log.enable').catch((e) => console.error('[cdp] Log.enable', e))
+  dbg.sendCommand('Performance.enable').catch((e) => console.error('[cdp] Performance.enable', e))
 
-  // Sondeo periódico de memoria (REQ-022).
+  // Sondeos periódicos (REQ-022 / REQ-023).
   memory.start()
+  performance.start()
 
   // Al navegar a otra página, limpiamos el estado de red acumulado.
   page.on('did-start-navigation', (_e, _url, isInPlace, isMainFrame) => {

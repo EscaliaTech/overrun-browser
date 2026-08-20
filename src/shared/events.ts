@@ -128,11 +128,36 @@ export interface MemoryEvent extends OverrunEventBase {
 }
 
 // ---------------------------------------------------------------------------
+// Dominio: performance (v1 — REQ-023)
+//
+// Señales ATRIBUIBLES A LA PÁGINA (no CPU% de proceso del SO). Se derivan de
+// `Performance.getMetrics` (contadores acumulados) por diferencia entre sondeos.
+// ---------------------------------------------------------------------------
+
+export interface PerformanceRecord {
+  /** utilización del hilo principal en el intervalo: task time / wall time (%). */
+  cpuPct: number
+  /** ms de ejecución de JS en el intervalo (ScriptDuration). */
+  jsMs: number
+  /** ms de layout + recalc de estilos en el intervalo. */
+  renderMs: number
+  /** layouts en el intervalo. */
+  layouts: number
+  /** frames por segundo (delta de Frames / intervalo). */
+  fps: number
+}
+
+export interface PerformanceEvent extends OverrunEventBase {
+  domain: 'performance'
+  record: PerformanceRecord
+}
+
+// ---------------------------------------------------------------------------
 // Unión de todos los eventos del bus. Otros dominios se suman aquí sin rediseño.
 // ---------------------------------------------------------------------------
 
-export type OverrunEvent = NetworkEvent | ConsoleEvent | MemoryEvent
-// | PerformanceEvent | StorageEvent | SecurityEvent (próximas fases)
+export type OverrunEvent = NetworkEvent | ConsoleEvent | MemoryEvent | PerformanceEvent
+// | StorageEvent | SecurityEvent (próximas fases)
 
 /** Canales IPC — un único punto para no tipear strings sueltos. */
 export const IPC = {

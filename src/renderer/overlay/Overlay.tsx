@@ -2,13 +2,15 @@ import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as R
 import { NetworkPanel } from './NetworkPanel'
 import { ConsolePanel } from './ConsolePanel'
 import { MemoryPanel } from './MemoryPanel'
+import { PerformancePanel } from './PerformancePanel'
 import { useNetwork } from './useNetwork'
 import { useConsole } from './useConsole'
 import { useMemory } from './useMemory'
+import { usePerformance } from './usePerformance'
 
 type Tab = 'Network' | 'Console' | 'Memory' | 'CPU' | 'Storage'
 const TABS: Tab[] = ['Network', 'Console', 'Memory', 'CPU', 'Storage']
-const ENABLED: Tab[] = ['Network', 'Console', 'Memory'] // v1 en progreso
+const ENABLED: Tab[] = ['Network', 'Console', 'Memory', 'CPU'] // v1 en progreso
 
 // Arrastre del overlay: captura el puntero y manda deltas de pantalla al main,
 // que reposiciona la vista. `moved` distingue drag de click (para el pill).
@@ -62,6 +64,7 @@ export function Overlay(): JSX.Element {
   const net = useNetwork()
   const con = useConsole()
   const mem = useMemory()
+  const perf = usePerformance()
 
   useEffect(() => window.overrun.onOverlayState(setCollapsed), [])
 
@@ -97,7 +100,7 @@ export function Overlay(): JSX.Element {
         })}
       </div>
 
-      {tab === 'Network' ? <NetworkPanel net={net} /> : tab === 'Console' ? <ConsolePanel con={con} /> : tab === 'Memory' ? <MemoryPanel mem={mem} /> : <Placeholder tab={tab} />}
+      {tab === 'Network' ? <NetworkPanel net={net} /> : tab === 'Console' ? <ConsolePanel con={con} /> : tab === 'Memory' ? <MemoryPanel mem={mem} /> : tab === 'CPU' ? <PerformancePanel perf={perf} /> : <Placeholder tab={tab} />}
 
       {/* footer */}
       <div style={{ height: 34, display: 'flex', alignItems: 'center', gap: 8, padding: '0 14px', borderTop: '1px solid #22262e', fontFamily: 'var(--font-mono)' }}>
