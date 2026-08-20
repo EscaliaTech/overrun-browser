@@ -11,6 +11,8 @@ export function ConsolePanel({ con }: { con: ConsoleView }): JSX.Element {
   const rows = useVirtualizer({
     count: records.length,
     getScrollElement: () => parent.current,
+    // Estimado inicial; la altura real la mide `measureElement` por fila, porque
+    // el texto largo envuelve a varias líneas y una fila fija se solaparía.
     estimateSize: () => 30,
     overscan: 12
   })
@@ -34,7 +36,7 @@ export function ConsolePanel({ con }: { con: ConsoleView }): JSX.Element {
         )}
         <div style={{ height: rows.getTotalSize(), position: 'relative' }}>
           {rows.getVirtualItems().map((vi) => (
-            <Line key={vi.key} rec={records[vi.index]} top={vi.start} />
+            <Line key={vi.key} rec={records[vi.index]} top={vi.start} index={vi.index} measure={rows.measureElement} />
           ))}
         </div>
       </div>
@@ -42,10 +44,11 @@ export function ConsolePanel({ con }: { con: ConsoleView }): JSX.Element {
   )
 }
 
-function Line({ rec, top }: { rec: ConsoleRecord; top: number }): JSX.Element {
+function Line({ rec, top, index, measure }: { rec: ConsoleRecord; top: number; index: number; measure: (node: Element | null) => void }): JSX.Element {
   const c = levelColor(rec.level)
   return (
-    <div style={{ position: 'absolute', top, left: 0, right: 0, minHeight: 30, display: 'flex', gap: 9, alignItems: 'flex-start', padding: '6px 12px', borderBottom: '1px solid #16181d', fontSize: 11, lineHeight: 1.4 }}>
+    <div ref={measure} data-index={index}
+      style={{ position: 'absolute', top, left: 0, right: 0, minHeight: 30, display: 'flex', gap: 9, alignItems: 'flex-start', padding: '6px 12px', borderBottom: '1px solid #16181d', fontSize: 11, lineHeight: 1.4 }}>
       <Glyph level={rec.level} />
       <span style={{ flex: 1, color: c.text, wordBreak: 'break-word', userSelect: 'text' }}>{rec.text}</span>
       {rec.url && (
