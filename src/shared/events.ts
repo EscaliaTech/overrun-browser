@@ -108,11 +108,31 @@ export interface ConsoleEvent extends OverrunEventBase {
 }
 
 // ---------------------------------------------------------------------------
+// Dominio: memory (v1 — REQ-022)
+//
+// A diferencia de network/console (eventos que CDP empuja), heap y DOM counters
+// se obtienen por COMANDO — el main los sondea periódicamente y emite snapshots.
+// ---------------------------------------------------------------------------
+
+export interface MemoryRecord {
+  jsHeapUsed: number // bytes
+  jsHeapTotal: number // bytes
+  domNodes: number
+  documents: number
+  listeners: number
+}
+
+export interface MemoryEvent extends OverrunEventBase {
+  domain: 'memory'
+  record: MemoryRecord
+}
+
+// ---------------------------------------------------------------------------
 // Unión de todos los eventos del bus. Otros dominios se suman aquí sin rediseño.
 // ---------------------------------------------------------------------------
 
-export type OverrunEvent = NetworkEvent | ConsoleEvent
-// | MemoryEvent | PerformanceEvent | StorageEvent | SecurityEvent (próximas fases)
+export type OverrunEvent = NetworkEvent | ConsoleEvent | MemoryEvent
+// | PerformanceEvent | StorageEvent | SecurityEvent (próximas fases)
 
 /** Canales IPC — un único punto para no tipear strings sueltos. */
 export const IPC = {
