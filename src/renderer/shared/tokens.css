@@ -1,0 +1,36 @@
+/* Tokens de marca Overrun (BRANDING / D-009). Fuente única para chrome + overlay. */
+:root {
+  --void: #0a0b0d;
+  --surface: #14161b;
+  --surface-2: #101216;
+  --line: #262a32;
+  --line-soft: #1c2027;
+  --text: #e6e8ea;
+  --dim: #8a9099;
+  --mute: #5f6670;
+
+  --cyan: oklch(0.82 0.15 195); /* primary — vivo/activo */
+  --cyan-bright: oklch(0.86 0.13 195);
+  --green: oklch(0.82 0.15 150); /* ok */
+  --amber: oklch(0.82 0.15 85); /* warn */
+  --signal: oklch(0.7 0.19 25); /* alert */
+
+  --font-ui: 'Space Grotesk', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+body {
+  font-family: var(--font-ui);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
