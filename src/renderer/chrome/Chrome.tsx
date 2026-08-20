@@ -7,6 +7,8 @@ export function Chrome(): JSX.Element {
   const [draft, setDraft] = useState('')
   const [tabs, setTabs] = useState<TabsState>({ tabs: [], activeId: '' })
   const [marks, setMarks] = useState<BookmarksState>({ items: [], barVisible: false, currentSaved: false })
+  // Histórico de las últimas 5 búsquedas/URLs (sesión; el chrome no se recarga).
+  const [history, setHistory] = useState<string[]>([])
 
   useEffect(() => window.overrun.onNavState((s) => {
     setNav(s)
@@ -15,7 +17,12 @@ export function Chrome(): JSX.Element {
   useEffect(() => window.overrun.onTabsState(setTabs), [])
   useEffect(() => window.overrun.onBookmarksState(setMarks), [])
 
-  const go = (): void => window.overrun.navigate(draft)
+  const go = (): void => {
+    const url = draft.trim()
+    if (!url) return
+    window.overrun.navigate(url)
+    setHistory((h) => [url, ...h.filter((u) => u !== url)].slice(0, 5))
+  }
 
   return (
     <div style={{ height: '100%', background: 'var(--void)', display: 'flex', flexDirection: 'column' }}>
@@ -51,13 +58,15 @@ export function Chrome(): JSX.Element {
               </div>
             )
           })}
-          <button
-            onClick={() => window.overrun.tabNew()}
-            title="Nueva pestaña"
-            style={{ width: 26, height: 26, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7, border: '1px solid var(--line-soft)', background: 'transparent', color: 'var(--dim)', cursor: 'pointer', fontSize: 16, lineHeight: 1 }}>
-            +
-          </button>
         </div>
+
+        {/* nueva pestaña — fuera del scroll de tabs, siempre visible junto a la última */}
+        <button
+          onClick={() => window.overrun.tabNew()}
+          title="Nueva pestaña"
+          style={{ width: 26, height: 26, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7, border: '1px solid var(--line-soft)', background: 'transparent', color: 'var(--dim)', cursor: 'pointer', fontSize: 16, lineHeight: 1, WebkitAppRegion: 'no-drag' }}>
+          +
+        </button>
       </div>
 
       {/* toolbar */}
@@ -75,8 +84,12 @@ export function Chrome(): JSX.Element {
           onKeyDown={(e) => e.key === 'Enter' && go()}
           spellCheck={false}
           placeholder="Ingresá una URL"
+          list="url-history"
           style={{ flex: 1, height: 34, padding: '0 14px', borderRadius: 9, background: 'var(--surface)', border: '1px solid var(--line)', color: '#cfd3d9', fontFamily: 'var(--font-mono)', fontSize: 12.5, outline: 'none', userSelect: 'text' }}
         />
+        <datalist id="url-history">
+          {history.map((u) => <option key={u} value={u} />)}
+        </datalist>
         {/* resolución actual del viewport de la página */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 34, padding: '0 12px', borderRadius: 9, background: 'var(--surface)', border: '1px solid var(--line)' }}>
           <svg width="14" height="14" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="8" rx="1" stroke="var(--dim)" strokeWidth="1.3" fill="none" /><path d="M6 13 H10" stroke="var(--dim)" strokeWidth="1.3" strokeLinecap="round" /></svg>
