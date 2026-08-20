@@ -12,9 +12,9 @@ type Tab = 'Network' | 'Console' | 'Memory' | 'CPU' | 'Storage'
 const TABS: Tab[] = ['Network', 'Console', 'Memory', 'CPU', 'Storage']
 const ENABLED: Tab[] = ['Network', 'Console', 'Memory', 'CPU'] // v1 en progreso
 
-// Arrastre del overlay: captura el puntero y manda deltas de pantalla al main,
-// que reposiciona la vista. `moved` distingue drag de click (para el pill).
-function useDrag(): {
+// Gesto de arrastre genérico: captura el puntero y manda deltas de pantalla al
+// callback (mover o redimensionar). `moved` distingue drag de click (para el pill).
+function useDrag(onDelta: (dx: number, dy: number) => void): {
   handlers: {
     onPointerDown: (e: ReactPointerEvent) => void
     onPointerMove: (e: ReactPointerEvent) => void
@@ -39,7 +39,7 @@ function useDrag(): {
         const dy = e.screenY - d.y
         if (dx || dy) {
           if (Math.abs(dx) > 2 || Math.abs(dy) > 2) moved.current = true
-          window.overrun.overlayMove(dx, dy)
+          onDelta(dx, dy)
           d.x = e.screenX
           d.y = e.screenY
         }
@@ -58,7 +58,8 @@ function useDrag(): {
 export function Overlay(): JSX.Element {
   const [collapsed, setCollapsed] = useState(false)
   const [tab, setTab] = useState<Tab>('Network')
-  const drag = useDrag()
+  const drag = useDrag((dx, dy) => window.overrun.overlayMove(dx, dy))
+  const resize = useDrag((dx, dy) => window.overrun.overlayResize(dx, dy))
   // Hooks montados SIEMPRE (aun colapsado) → los dominios se recolectan sin
   // importar el tab activo ni el estado del overlay.
   const net = useNetwork()
@@ -72,6 +73,12 @@ export function Overlay(): JSX.Element {
 
   return (
     <div style={panelStyle}>
+      {/* handle de resize — esquina superior-izquierda */}
+      <div {...resize.handlers} title="redimensionar"
+        style={{ position: 'absolute', top: 0, left: 0, width: 16, height: 16, cursor: 'nwse-resize', zIndex: 10, display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-start', padding: 3 }}>
+        <svg width="9" height="9" viewBox="0 0 9 9" style={{ color: 'var(--mute)' }}><path d="M1 8 L1 1 L8 1 M1 4 L4 1 M1 7 L7 1" stroke="currentColor" strokeWidth="1" fill="none" strokeLinecap="round" /></svg>
+      </div>
+
       {/* header — zona de arrastre */}
       <div style={{ height: 42, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 14px', borderBottom: '1px solid #22262e' }}>
         <div {...drag.handlers} style={{ display: 'flex', alignItems: 'center', gap: 9, flex: 1, height: '100%', cursor: 'move' }}>

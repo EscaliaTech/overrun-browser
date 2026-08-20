@@ -6,13 +6,24 @@ import { Throughput } from './Throughput'
 import { RequestDetail } from './RequestDetail'
 
 // Panel Network (D-015 / REQ-020): stats + throughput (Canvas) + tabla virtualizada + detalle.
+const TYPES = ['all', 'fetch', 'js', 'css', 'img', 'doc', 'other'] as const
+type TypeFilter = (typeof TYPES)[number]
+const TYPE_LABEL: Record<TypeFilter, string> = { all: 'Todo', fetch: 'Fetch/XHR', js: 'JS', css: 'CSS', img: 'Img', doc: 'Doc', other: 'Otro' }
+
 export function NetworkPanel({ net }: { net: NetworkView }): JSX.Element {
   const { records, stats, throughput, clear } = net
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [type, setType] = useState<TypeFilter>('all')
   const parent = useRef<HTMLDivElement>(null)
 
+  const q = search.toLowerCase()
+  const filtered = records.filter(
+    (r) => matchType(r.type, type) && (q === '' || r.url.toLowerCase().includes(q))
+  )
+
   const rows = useVirtualizer({
-    count: records.length,
+    count: filtered.length,
     getScrollElement: () => parent.current,
     estimateSize: () => 26,
     overscan: 12
@@ -39,6 +50,24 @@ export function NetworkPanel({ net }: { net: NetworkView }): JSX.Element {
         <Throughput t={throughput.t} bytes={throughput.bytes} />
       </div>
 
+      {/* filtros: búsqueda + tipo */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid #22262e' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 7, height: 28, padding: '0 10px', borderRadius: 7, background: 'var(--surface)', border: '1px solid var(--line)' }}>
+          <svg width="12" height="12" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5" stroke="var(--mute)" strokeWidth="1.3" fill="none" /><path d="M10.5 10.5 L14 14" stroke="var(--mute)" strokeWidth="1.3" strokeLinecap="round" /></svg>
+          <input value={search} onChange={(e) => setSearch(e.target.value)} spellCheck={false} placeholder="filtrar por URL"
+            style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#cfd3d9', fontFamily: 'var(--font-mono)', fontSize: 11, userSelect: 'text' }} />
+          {search && (
+            <button onClick={() => setSearch('')} style={{ background: 'transparent', border: 'none', color: 'var(--mute)', cursor: 'pointer', display: 'flex', padding: 0 }}>
+              <svg width="11" height="11" viewBox="0 0 12 12"><path d="M3 3 L9 9 M9 3 L3 9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
+            </button>
+          )}
+        </div>
+        <select value={type} onChange={(e) => setType(e.target.value as TypeFilter)}
+          style={{ height: 28, borderRadius: 7, background: 'var(--surface)', border: '1px solid var(--line)', color: '#cfd3d9', fontFamily: 'var(--font-mono)', fontSize: 11, padding: '0 6px', outline: 'none', cursor: 'pointer' }}>
+          {TYPES.map((t) => <option key={t} value={t} style={{ background: '#14161b' }}>{TYPE_LABEL[t]}</option>)}
+        </select>
+      </div>
+
       {/* header tabla */}
       <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr 40px 56px 46px', padding: '6px 12px', fontSize: 9, letterSpacing: '0.06em', color: 'var(--mute)', fontFamily: 'var(--font-mono)', borderBottom: '1px solid #22262e' }}>
         <span>MTD</span>
@@ -48,11 +77,16 @@ export function NetworkPanel({ net }: { net: NetworkView }): JSX.Element {
         <span style={{ textAlign: 'right' }}>TIME</span>
       </div>
 
-      {/* filas virtualizadas */}
+      {/* filas virtualizadas (sobre el conjunto filtrado) */}
       <div ref={parent} style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+        {filtered.length === 0 && (
+          <div style={{ padding: 20, fontSize: 11, color: 'var(--mute)', fontFamily: 'var(--font-mono)' }}>
+            {records.length === 0 ? 'Sin requests aún.' : 'Ningún request coincide con el filtro.'}
+          </div>
+        )}
         <div style={{ height: rows.getTotalSize(), position: 'relative' }}>
           {rows.getVirtualItems().map((vi) => (
-            <Row key={vi.key} rec={records[vi.index]} top={vi.start} even={vi.index % 2 === 0} onClick={() => setSelectedId(records[vi.index].requestId)} />
+            <Row key={vi.key} rec={filtered[vi.index]} top={vi.start} even={vi.index % 2 === 0} onClick={() => setSelectedId(filtered[vi.index].requestId)} />
           ))}
         </div>
       </div>
@@ -89,6 +123,21 @@ function nameOf(url: string): string {
   } catch {
     return url
   }
+}
+
+const TYPE_GROUPS: Record<Exclude<TypeFilter, 'all' | 'other'>, string[]> = {
+  fetch: ['XHR', 'Fetch', 'EventSource'],
+  js: ['Script'],
+  css: ['Stylesheet'],
+  img: ['Image'],
+  doc: ['Document']
+}
+
+function matchType(recType: string | undefined, filter: TypeFilter): boolean {
+  if (filter === 'all') return true
+  const t = recType ?? 'Other'
+  if (filter === 'other') return !Object.values(TYPE_GROUPS).some((g) => g.includes(t))
+  return TYPE_GROUPS[filter].includes(t)
 }
 
 function methodColor(m: string): string {
