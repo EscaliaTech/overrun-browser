@@ -1,13 +1,13 @@
 import { useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { NetworkRecord } from '../../shared/events'
-import { useNetwork } from './useNetwork'
+import type { NetworkView } from './useNetwork'
 import { Throughput } from './Throughput'
 import { RequestDetail } from './RequestDetail'
 
 // Panel Network (D-015 / REQ-020): stats + throughput (Canvas) + tabla virtualizada + detalle.
-export function NetworkPanel(): JSX.Element {
-  const { records, stats, throughput, clear } = useNetwork()
+export function NetworkPanel({ net }: { net: NetworkView }): JSX.Element {
+  const { records, stats, throughput, clear } = net
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const parent = useRef<HTMLDivElement>(null)
 

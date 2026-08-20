@@ -1,5 +1,6 @@
 import type { WebContents } from 'electron'
 import { handleCdpNetwork, resetNetwork } from '../events/network'
+import { handleCdpConsole } from '../events/console'
 
 // ============================================================================
 // Capa CDP (D-002) — DESACOPLADA de la base (REQ-062): si mañana se migra a
@@ -23,15 +24,20 @@ export function attachCdp(page: WebContents): void {
   // Rutea cada mensaje CDP al normalizador de su dominio.
   dbg.on('message', (_event, method, params) => {
     if (method.startsWith('Network.')) handleCdpNetwork(method, params)
-    // Próximas fases: Runtime.*/Log.* → console, HeapProfiler/Memory → memory, etc.
+    else if (method === 'Runtime.consoleAPICalled' || method === 'Runtime.exceptionThrown' || method === 'Log.entryAdded') {
+      handleCdpConsole(method, params)
+    }
+    // Próximas fases: HeapProfiler/Memory → memory, Performance → performance, etc.
   })
 
   dbg.on('detach', (_event, reason) => {
     console.warn('[cdp] debugger detached:', reason)
   })
 
-  // Dominios habilitados en el MVP (D-015: Network primero).
+  // Dominios habilitados: Network (D-015) + Runtime/Log para consola (REQ-021).
   dbg.sendCommand('Network.enable').catch((e) => console.error('[cdp] Network.enable', e))
+  dbg.sendCommand('Runtime.enable').catch((e) => console.error('[cdp] Runtime.enable', e))
+  dbg.sendCommand('Log.enable').catch((e) => console.error('[cdp] Log.enable', e))
 
   // Al navegar a otra página, limpiamos el estado de red acumulado.
   page.on('did-start-navigation', (_e, _url, isInPlace, isMainFrame) => {

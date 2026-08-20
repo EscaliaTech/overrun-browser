@@ -85,11 +85,34 @@ export interface NetworkEvent extends OverrunEventBase {
 }
 
 // ---------------------------------------------------------------------------
+// Dominio: console (v1 — REQ-021)
+// ---------------------------------------------------------------------------
+
+export type ConsoleLevel = 'log' | 'info' | 'warn' | 'error' | 'debug'
+
+/** De dónde salió la entrada: API de consola, excepción no capturada, o log del navegador. */
+export type ConsoleOrigin = 'console' | 'exception' | 'browser'
+
+export interface ConsoleRecord {
+  id: number
+  level: ConsoleLevel
+  origin: ConsoleOrigin
+  text: string
+  url?: string
+  line?: number
+}
+
+export interface ConsoleEvent extends OverrunEventBase {
+  domain: 'console'
+  record: ConsoleRecord
+}
+
+// ---------------------------------------------------------------------------
 // Unión de todos los eventos del bus. Otros dominios se suman aquí sin rediseño.
 // ---------------------------------------------------------------------------
 
-export type OverrunEvent = NetworkEvent
-// | ConsoleEvent | MemoryEvent | PerformanceEvent | StorageEvent | SecurityEvent (próximas fases)
+export type OverrunEvent = NetworkEvent | ConsoleEvent
+// | MemoryEvent | PerformanceEvent | StorageEvent | SecurityEvent (próximas fases)
 
 /** Canales IPC — un único punto para no tipear strings sueltos. */
 export const IPC = {

@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import { NetworkPanel } from './NetworkPanel'
+import { ConsolePanel } from './ConsolePanel'
+import { useNetwork } from './useNetwork'
+import { useConsole } from './useConsole'
 
-type Tab = 'Network' | 'CPU' | 'Memory' | 'Console' | 'Storage'
-const TABS: Tab[] = ['Network', 'CPU', 'Memory', 'Console', 'Storage']
+type Tab = 'Network' | 'Console' | 'CPU' | 'Memory' | 'Storage'
+const TABS: Tab[] = ['Network', 'Console', 'CPU', 'Memory', 'Storage']
+const ENABLED: Tab[] = ['Network', 'Console'] // v1 en progreso
 
 // Arrastre del overlay: captura el puntero y manda deltas de pantalla al main,
 // que reposiciona la vista. `moved` distingue drag de click (para el pill).
@@ -51,6 +55,10 @@ export function Overlay(): JSX.Element {
   const [collapsed, setCollapsed] = useState(false)
   const [tab, setTab] = useState<Tab>('Network')
   const drag = useDrag()
+  // Hooks montados SIEMPRE (aun colapsado) → los dominios se recolectan sin
+  // importar el tab activo ni el estado del overlay.
+  const net = useNetwork()
+  const con = useConsole()
 
   useEffect(() => window.overrun.onOverlayState(setCollapsed), [])
 
@@ -73,18 +81,20 @@ export function Overlay(): JSX.Element {
       <div style={{ display: 'flex', gap: 4, padding: '8px 10px 0', borderBottom: '1px solid #22262e', fontFamily: 'var(--font-mono)' }}>
         {TABS.map((t) => {
           const active = t === tab
-          const enabled = t === 'Network' // MVP: solo Network (D-015)
+          const enabled = ENABLED.includes(t)
+          const badge = t === 'Console' && con.counts.error > 0 ? con.counts.error : 0
           return (
             <div key={t}
               onClick={() => enabled && setTab(t)}
-              style={{ padding: '7px 11px', fontSize: 11, cursor: enabled ? 'pointer' : 'default', color: active ? 'var(--cyan-bright)' : enabled ? '#9aa1ab' : '#4a5058', borderBottom: active ? '2px solid var(--cyan)' : '2px solid transparent', marginBottom: -1 }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 11px', fontSize: 11, cursor: enabled ? 'pointer' : 'default', color: active ? 'var(--cyan-bright)' : enabled ? '#9aa1ab' : '#4a5058', borderBottom: active ? '2px solid var(--cyan)' : '2px solid transparent', marginBottom: -1 }}>
               {t}
+              {badge > 0 && <span style={{ fontSize: 9, color: 'oklch(0.7 0.19 25)' }}>{badge}</span>}
             </div>
           )
         })}
       </div>
 
-      {tab === 'Network' ? <NetworkPanel /> : <Placeholder tab={tab} />}
+      {tab === 'Network' ? <NetworkPanel net={net} /> : tab === 'Console' ? <ConsolePanel con={con} /> : <Placeholder tab={tab} />}
 
       {/* footer */}
       <div style={{ height: 34, display: 'flex', alignItems: 'center', gap: 8, padding: '0 14px', borderTop: '1px solid #22262e', fontFamily: 'var(--font-mono)' }}>
