@@ -1,5 +1,14 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { IPC, type NavAction, type NavState, type OverlayControl, type OverrunEvent, type ResponseBody } from '../shared/events'
+import {
+  IPC,
+  type NavAction,
+  type NavState,
+  type OverlayControl,
+  type OverrunEvent,
+  type ResponseBody,
+  type TabsState,
+  type BookmarksState
+} from '../shared/events'
 
 // ============================================================================
 // Preload — expone una API mínima y tipada a los renderers (chrome / overlay).
@@ -25,6 +34,41 @@ const api = {
     const listener = (_e: unknown, state: NavState): void => fn(state)
     ipcRenderer.on(IPC.navState, listener)
     return () => ipcRenderer.off(IPC.navState, listener)
+  },
+
+  // ---- chrome: pestañas ----
+  tabNew(): void {
+    ipcRenderer.send(IPC.tabNew)
+  },
+  tabClose(id: string): void {
+    ipcRenderer.send(IPC.tabClose, id)
+  },
+  tabActivate(id: string): void {
+    ipcRenderer.send(IPC.tabActivate, id)
+  },
+  onTabsState(fn: (state: TabsState) => void): () => void {
+    const listener = (_e: unknown, state: TabsState): void => fn(state)
+    ipcRenderer.on(IPC.tabsState, listener)
+    return () => ipcRenderer.off(IPC.tabsState, listener)
+  },
+
+  // ---- chrome: bookmarks ----
+  bookmarkToggle(): void {
+    ipcRenderer.send(IPC.bookmarkToggle)
+  },
+  bookmarkOpen(url: string): void {
+    ipcRenderer.send(IPC.bookmarkOpen, url)
+  },
+  bookmarkRemove(id: string): void {
+    ipcRenderer.send(IPC.bookmarkRemove, id)
+  },
+  bookmarksBarToggle(): void {
+    ipcRenderer.send(IPC.bookmarksBarToggle)
+  },
+  onBookmarksState(fn: (state: BookmarksState) => void): () => void {
+    const listener = (_e: unknown, state: BookmarksState): void => fn(state)
+    ipcRenderer.on(IPC.bookmarksState, listener)
+    return () => ipcRenderer.off(IPC.bookmarksState, listener)
   },
 
   // ---- overlay: control de estado (colapsar / expandir) (D-017) ----

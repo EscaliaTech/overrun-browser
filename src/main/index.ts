@@ -1,6 +1,10 @@
 import { app, BaseWindow, Menu } from 'electron'
-import { electronApp } from '@electron-toolkit/utils'
+import { electronApp, is } from '@electron-toolkit/utils'
 import { createWindow } from './window'
+
+// El aviso de CSP inseguro de Electron es ruido en dev: aplica a cada página
+// externa que se inspecciona (no controlamos su CSP) y no aparece empaquetado.
+if (is.dev) process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true'
 
 // Sin barra de menú nativa (File/Edit/View…). Overrun usa su propio chrome.
 Menu.setApplicationMenu(null)

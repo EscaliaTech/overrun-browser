@@ -178,12 +178,61 @@ export const IPC = {
   /** overlay → main: redimensionar el panel desde la esquina superior-izquierda. */
   overlayResize: 'overrun:overlay-resize',
   /** overlay → main (invoke): pide el body de una respuesta on-demand. */
-  getResponseBody: 'overrun:get-response-body'
+  getResponseBody: 'overrun:get-response-body',
+
+  // ---- pestañas (multi-tab) ----
+  /** main → chrome: lista de pestañas + cuál está activa. */
+  tabsState: 'overrun:tabs-state',
+  /** chrome → main: abrir una pestaña nueva. */
+  tabNew: 'overrun:tab-new',
+  /** chrome → main: cerrar una pestaña por id. */
+  tabClose: 'overrun:tab-close',
+  /** chrome → main: activar una pestaña por id. */
+  tabActivate: 'overrun:tab-activate',
+
+  // ---- bookmarks ----
+  /** main → chrome: estado de bookmarks (lista, barra visible, url actual guardada). */
+  bookmarksState: 'overrun:bookmarks-state',
+  /** chrome → main: guardar/quitar la URL de la pestaña activa. */
+  bookmarkToggle: 'overrun:bookmark-toggle',
+  /** chrome → main: abrir un bookmark (navega la pestaña activa). */
+  bookmarkOpen: 'overrun:bookmark-open',
+  /** chrome → main: quitar un bookmark por id. */
+  bookmarkRemove: 'overrun:bookmark-remove',
+  /** chrome → main: mostrar/ocultar la barra de bookmarks (retráctil). */
+  bookmarksBarToggle: 'overrun:bookmarks-bar-toggle'
 } as const
 
 export interface ResponseBody {
   body: string
   base64: boolean
+}
+
+/** Una pestaña abierta, como la ve el chrome (el WebContentsView vive en el main). */
+export interface TabInfo {
+  id: string
+  title: string
+  url: string
+  loading: boolean
+}
+
+export interface TabsState {
+  tabs: TabInfo[]
+  activeId: string
+}
+
+export interface Bookmark {
+  id: string
+  url: string
+  title: string
+}
+
+export interface BookmarksState {
+  items: Bookmark[]
+  /** barra de bookmarks desplegada (retráctil). */
+  barVisible: boolean
+  /** la URL de la pestaña activa ya está guardada (estrella llena). */
+  currentSaved: boolean
 }
 
 export interface Viewport {
@@ -196,7 +245,7 @@ export interface NavState {
   canGoBack: boolean
   canGoForward: boolean
   loading: boolean
-  /** resolución real del viewport de la página (pageView). */
+  /** resolución real del viewport de la página (pestaña activa). */
   viewport: Viewport
 }
 
