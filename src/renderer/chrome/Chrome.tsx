@@ -37,7 +37,7 @@ export function Chrome(): JSX.Element {
         </div>
 
         {/* pestañas abiertas */}
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, flex: 1, minWidth: 0, height: '100%', overflowX: 'auto', WebkitAppRegion: 'no-drag' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, flex: '0 1 auto', minWidth: 0, height: '100%', overflowX: 'auto', WebkitAppRegion: 'no-drag' }}>
           {tabs.tabs.map((t) => {
             const active = t.id === tabs.activeId
             return (
