@@ -34,6 +34,9 @@ const api = {
   overlayMove(dx: number, dy: number): void {
     ipcRenderer.send(IPC.overlayMove, dx, dy)
   },
+  overlayResize(dx: number, dy: number): void {
+    ipcRenderer.send(IPC.overlayResize, dx, dy)
+  },
   getResponseBody(requestId: string): Promise<ResponseBody> {
     return ipcRenderer.invoke(IPC.getResponseBody, requestId)
   },

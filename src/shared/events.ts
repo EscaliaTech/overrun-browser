@@ -175,6 +175,8 @@ export const IPC = {
   overlayState: 'overrun:overlay-state',
   /** overlay → main: arrastrar el panel (delta en px de pantalla). */
   overlayMove: 'overrun:overlay-move',
+  /** overlay → main: redimensionar el panel desde la esquina superior-izquierda. */
+  overlayResize: 'overrun:overlay-resize',
   /** overlay → main (invoke): pide el body de una respuesta on-demand. */
   getResponseBody: 'overrun:get-response-body'
 } as const

@@ -20,9 +20,13 @@ import { IPC, type NavAction, type NavState, type OverlayControl, type ResponseB
 
 const CHROME_H = 92 // tab strip (40) + toolbar (52)
 const MARGIN = 26
-const OVERLAY_EXPANDED = { w: 452, h: 560 }
 const OVERLAY_COLLAPSED = { w: 232, h: 44 }
+const OVERLAY_MIN = { w: 340, h: 320 }
+const OVERLAY_MAX = { w: 900, h: 1200 }
 const START_URL = 'https://example.com'
+
+// Tamaño expandido — mutable (redimensionable por el usuario, REQ v1).
+let overlaySize = { w: 452, h: 560 }
 
 let win: BaseWindow
 let chromeView: WebContentsView
@@ -53,7 +57,7 @@ function layout(): void {
   chromeView.setBounds({ x: 0, y: 0, width, height: CHROME_H })
   pageView.setBounds({ x: 0, y: CHROME_H, width, height: height - CHROME_H })
 
-  const o = overlayCollapsed ? OVERLAY_COLLAPSED : OVERLAY_EXPANDED
+  const o = overlayCollapsed ? OVERLAY_COLLAPSED : overlaySize
   const pos = overlayPos ?? cornerPos(width, height, o)
   overlayView.setBounds({
     x: clamp(pos.x, 0, width - o.w),
@@ -171,12 +175,25 @@ function registerIpc(): void {
   // Arrastre del overlay: acumula deltas de pantalla sobre la posición actual.
   ipcMain.on(IPC.overlayMove, (_e, dx: number, dy: number) => {
     const { width, height } = win.getContentBounds()
-    const o = overlayCollapsed ? OVERLAY_COLLAPSED : OVERLAY_EXPANDED
+    const o = overlayCollapsed ? OVERLAY_COLLAPSED : overlaySize
     const cur = overlayPos ?? cornerPos(width, height, o)
     overlayPos = {
       x: clamp(cur.x + dx, 0, width - o.w),
       y: clamp(cur.y + dy, CHROME_H, height - o.h)
     }
+    layout()
+  })
+
+  // Resize desde la esquina superior-izquierda: crece hacia arriba/izquierda
+  // manteniendo fija la esquina inferior-derecha (anclaje natural del panel).
+  ipcMain.on(IPC.overlayResize, (_e, dx: number, dy: number) => {
+    if (overlayCollapsed) return
+    const { width, height } = win.getContentBounds()
+    const cur = overlayPos ?? cornerPos(width, height, overlaySize)
+    const newW = clamp(overlaySize.w - dx, OVERLAY_MIN.w, Math.min(OVERLAY_MAX.w, width))
+    const newH = clamp(overlaySize.h - dy, OVERLAY_MIN.h, Math.min(OVERLAY_MAX.h, height - CHROME_H))
+    overlayPos = { x: cur.x + (overlaySize.w - newW), y: cur.y + (overlaySize.h - newH) }
+    overlaySize = { w: newW, h: newH }
     layout()
   })
 }
