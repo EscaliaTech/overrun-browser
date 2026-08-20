@@ -1,0 +1,226 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: oklch(0.82 0.15 195); text-decoration: none; }
+    a:hover { color: oklch(0.88 0.14 195); }
+  </style>
+</helmet>
+
+<div style="width: 1440px; height: 900px; position: relative; background: #0a0b0d; overflow: hidden; font-family: 'Space Grotesk', system-ui, sans-serif; color: #e6e8ea;">
+
+  <!-- ============ OVERRUN CHROME: tab strip ============ -->
+  <div style="height: 40px; display: flex; align-items: center; gap: 14px; background: #0a0b0d; border-bottom: 1px solid #1c2027; padding: 0 14px;">
+    <!-- brand -->
+    <div style="display: flex; align-items: center; gap: 9px; padding-right: 4px;">
+      <div style="width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; background: #101318; border: 1px solid #2a3038; box-shadow: 0 0 14px -4px oklch(0.82 0.15 195 / 0.5);">
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+          <path d="M4.2 3.1 L11 7 L4.2 10.9 Z" fill="oklch(0.82 0.15 195)"/>
+        </svg>
+      </div>
+      <span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 700; font-size: 12px; letter-spacing: 0.18em; color: #e6e8ea;">OVERRUN</span>
+    </div>
+    <!-- tabs -->
+    <div style="display: flex; align-items: flex-end; gap: 6px; height: 100%;">
+      <div style="display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border-radius: 8px 8px 0 0; background: #101216; border: 1px solid #1c2027; border-bottom: none;">
+        <span style="width: 7px; height: 7px; border-radius: 50%; background: #2563eb;"></span>
+        <span style="font-size: 12px; color: #cfd3d9;">Northwind — Analytics</span>
+        <svg width="11" height="11" viewBox="0 0 12 12" style="opacity: 0.5;"><path d="M3 3 L9 9 M9 3 L3 9" stroke="#9aa1ab" stroke-width="1.4" stroke-linecap="round"/></svg>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; color: #6b7280;">
+        <span style="width: 7px; height: 7px; border-radius: 50%; background: #3a4048;"></span>
+        <span style="font-size: 12px;">localhost:5173</span>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 6px; color: #6b7280;">
+        <svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 2 V10 M2 6 H10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ OVERRUN CHROME: toolbar ============ -->
+  <div style="height: 52px; display: flex; align-items: center; gap: 12px; background: #0c0e12; border-bottom: 1px solid #1c2027; padding: 0 14px;">
+    <!-- nav buttons -->
+    <div style="display: flex; align-items: center; gap: 2px; color: #8a9099;">
+      <div style="width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 7px;">
+        <svg width="16" height="16" viewBox="0 0 16 16"><path d="M10 3 L5 8 L10 13" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div style="width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 7px; color: #4a5058;">
+        <svg width="16" height="16" viewBox="0 0 16 16"><path d="M6 3 L11 8 L6 13" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div style="width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 7px;">
+        <svg width="15" height="15" viewBox="0 0 16 16"><path d="M13 3 v3 h-3 M13 6 A5.5 5.5 0 1 0 13.5 10" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+    </div>
+    <!-- address bar -->
+    <div style="flex: 1; display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 14px; border-radius: 9px; background: #14161b; border: 1px solid #262a32;">
+      <svg width="13" height="13" viewBox="0 0 14 14"><rect x="2.5" y="6" width="9" height="6" rx="1.5" stroke="oklch(0.82 0.15 150)" stroke-width="1.3" fill="none"/><path d="M4.5 6 V4 a2.5 2.5 0 0 1 5 0 V6" stroke="oklch(0.82 0.15 150)" stroke-width="1.3" fill="none"/></svg>
+      <span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12.5px; color: #cfd3d9;">app.northwind.io</span>
+      <span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12.5px; color: #6b7280;">/dashboard</span>
+      <span style="flex: 1;"></span>
+      <span style="width: 6px; height: 6px; border-radius: 50%; background: oklch(0.82 0.15 195); box-shadow: 0 0 8px oklch(0.82 0.15 195 / 0.8);"></span>
+      <span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10.5px; color: #8a9099; letter-spacing: 0.04em;">LIVE</span>
+    </div>
+    <!-- viewport selector -->
+    <div style="display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; border-radius: 9px; background: #14161b; border: 1px solid #262a32;">
+      <svg width="14" height="14" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="8" rx="1" stroke="#8a9099" stroke-width="1.3" fill="none"/><path d="M6 13 H10" stroke="#8a9099" stroke-width="1.3" stroke-linecap="round"/></svg>
+      <span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; color: #cfd3d9;">1440 × 900</span>
+      <svg width="10" height="10" viewBox="0 0 12 12"><path d="M3 5 L6 8 L9 5" stroke="#6b7280" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <!-- responsive grid icon -->
+    <div style="width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border-radius: 9px; background: #14161b; border: 1px solid #262a32; color: #8a9099;">
+      <svg width="15" height="15" viewBox="0 0 16 16"><rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.3" fill="none"/><rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.3" fill="none"/><rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.3" fill="none"/><rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.3" fill="none"/></svg>
+    </div>
+    <!-- OBSERVABILITY toggle (active) -->
+    <div style="display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 13px; border-radius: 9px; background: oklch(0.82 0.15 195 / 0.14); border: 1px solid oklch(0.82 0.15 195 / 0.5); color: oklch(0.86 0.13 195); box-shadow: 0 0 16px -4px oklch(0.82 0.15 195 / 0.4);">
+      <svg width="15" height="15" viewBox="0 0 16 16"><path d="M1.5 8 h2.5 l1.5 -4 l2.5 8 l1.5 -4 h5" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em;">Observability</span>
+    </div>
+  </div>
+
+  <!-- ============ LOADED PAGE (the app under inspection) ============ -->
+  <div style="position: absolute; top: 92px; left: 0; width: 1440px; height: 808px; background: #f7f8fa; overflow: hidden;">
+    <!-- page header -->
+    <div style="height: 62px; display: flex; align-items: center; justify-content: space-between; padding: 0 48px; background: #ffffff; border-bottom: 1px solid #eceef1; font-family: 'Space Grotesk', system-ui, sans-serif;">
+      <div style="display: flex; align-items: center; gap: 40px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 26px; height: 26px; border-radius: 7px; background: #2563eb; display: flex; align-items: center; justify-content: center;">
+            <svg width="14" height="14" viewBox="0 0 16 16"><path d="M3 11 L6.5 5 L9.5 9 L13 3" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <span style="font-size: 16px; font-weight: 600; color: #0f172a;">Northwind</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 26px; font-size: 14px; color: #475569;">
+          <span>Product</span><span>Customers</span><span>Pricing</span><span>Docs</span>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 18px;">
+        <span style="font-size: 14px; color: #475569;">Sign in</span>
+        <div style="height: 36px; padding: 0 18px; display: flex; align-items: center; border-radius: 9px; background: #2563eb; color: #fff; font-size: 14px; font-weight: 500;">Start free</div>
+      </div>
+    </div>
+    <!-- hero -->
+    <div style="display: grid; grid-template-columns: 1.05fr 1fr; gap: 48px; padding: 72px 48px 0; font-family: 'Space Grotesk', system-ui, sans-serif;">
+      <div style="display: flex; flex-direction: column; gap: 24px; padding-top: 24px;">
+        <span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; letter-spacing: 0.18em; color: #2563eb;">PRODUCT ANALYTICS</span>
+        <h1 style="margin: 0; font-size: 52px; line-height: 1.05; font-weight: 600; letter-spacing: -0.02em; color: #0f172a; text-wrap: balance;">Understand every user journey.</h1>
+        <p style="margin: 0; font-size: 17px; line-height: 1.6; color: #64748b; max-width: 460px;">Track funnels, retention and events across web and mobile — without piping data through a warehouse first.</p>
+        <div style="display: flex; align-items: center; gap: 14px; padding-top: 6px;">
+          <div style="height: 46px; padding: 0 24px; display: flex; align-items: center; border-radius: 10px; background: #0f172a; color: #fff; font-size: 15px; font-weight: 500;">Get started</div>
+          <div style="height: 46px; padding: 0 24px; display: flex; align-items: center; gap: 8px; border-radius: 10px; border: 1px solid #d7dbe0; color: #0f172a; font-size: 15px;">Book a demo</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 26px; padding-top: 20px; opacity: 0.55;">
+          <span style="font-weight: 700; font-size: 15px; color: #0f172a;">Acme</span>
+          <span style="font-weight: 700; font-size: 15px; color: #0f172a;">Vertex</span>
+          <span style="font-weight: 700; font-size: 15px; color: #0f172a;">Lumen</span>
+          <span style="font-weight: 700; font-size: 15px; color: #0f172a;">Fjord</span>
+        </div>
+      </div>
+      <!-- product preview card -->
+      <div style="border-radius: 16px 16px 0 0; background: #ffffff; border: 1px solid #e8eaed; border-bottom: none; box-shadow: 0 24px 60px -30px rgba(15,23,42,0.35); overflow: hidden;">
+        <div style="height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px solid #eef0f2;">
+          <span style="width: 9px; height: 9px; border-radius: 50%; background: #e2e5e9;"></span>
+          <span style="width: 9px; height: 9px; border-radius: 50%; background: #e2e5e9;"></span>
+          <span style="width: 9px; height: 9px; border-radius: 50%; background: #e2e5e9;"></span>
+          <span style="margin-left: 10px; font-size: 12px; color: #94a3b8; font-family: 'JetBrains Mono', ui-monospace, monospace;">Weekly active users</span>
+        </div>
+        <div style="padding: 22px;">
+          <div style="display: flex; align-items: flex-end; gap: 12px;">
+            <span style="font-size: 34px; font-weight: 600; color: #0f172a; letter-spacing: -0.02em;">128,402</span>
+            <span style="display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: #16a34a; padding-bottom: 8px; font-weight: 500;"><svg width="9" height="9" viewBox="0 0 10 10"><path d="M5 2 L9 8 L1 8 Z" fill="#16a34a"/></svg>12.4%</span>
+          </div>
+          <svg viewBox="0 0 420 150" style="width: 100%; height: 150px; margin-top: 14px;" preserveAspectRatio="none">
+            <defs><linearGradient id="np" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2563eb" stop-opacity="0.18"/><stop offset="1" stop-color="#2563eb" stop-opacity="0"/></linearGradient></defs>
+            <path d="M0 120 C40 110 70 80 110 88 C150 96 175 60 210 54 C250 47 280 70 320 52 C360 36 390 44 420 30 L420 150 L0 150 Z" fill="url(#np)"/>
+            <path d="M0 120 C40 110 70 80 110 88 C150 96 175 60 210 54 C250 47 280 70 320 52 C360 36 390 44 420 30" fill="none" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round"/>
+          </svg>
+          <div style="display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; margin-top: 18px;">
+            <div style="padding: 12px; border-radius: 10px; background: #f6f8fb;"><div style="font-size: 12px; color: #94a3b8;">Sessions</div><div style="font-size: 18px; font-weight: 600; color: #0f172a; margin-top: 4px;">42.1k</div></div>
+            <div style="padding: 12px; border-radius: 10px; background: #f6f8fb;"><div style="font-size: 12px; color: #94a3b8;">Retention</div><div style="font-size: 18px; font-weight: 600; color: #0f172a; margin-top: 4px;">68%</div></div>
+            <div style="padding: 12px; border-radius: 10px; background: #f6f8fb;"><div style="font-size: 12px; color: #94a3b8;">Avg. time</div><div style="font-size: 18px; font-weight: 600; color: #0f172a; margin-top: 4px;">4m 12s</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ OVERRUN OVERLAY: expanded (Network) ============ -->
+  <div style="position: absolute; right: 26px; bottom: 26px; width: 452px; background: rgba(12,14,18,0.9); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid #2b303a; border-radius: 16px; box-shadow: 0 30px 70px -20px rgba(0,0,0,0.75), 0 0 50px -14px oklch(0.82 0.15 195 / 0.3); overflow: hidden; font-family: 'JetBrains Mono', ui-monospace, monospace;">
+    <!-- overlay header -->
+    <div style="height: 42px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; border-bottom: 1px solid #22262e;">
+      <div style="display: flex; align-items: center; gap: 9px;">
+        <span style="width: 7px; height: 7px; border-radius: 50%; background: oklch(0.82 0.15 195); box-shadow: 0 0 9px oklch(0.82 0.15 195 / 0.9);"></span>
+        <span style="font-size: 10.5px; letter-spacing: 0.18em; color: #b8bec7; font-weight: 600;">OBSERVABILITY</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; color: #5f6670;">
+        <svg width="13" height="13" viewBox="0 0 16 16"><path d="M8 2 v4 M8 2 l-2.5 2 M8 2 l2.5 2 M3 9 h10 v4 a1 1 0 0 1 -1 1 H4 a1 1 0 0 1 -1 -1 Z" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <svg width="13" height="13" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M8 1.5 v2 M8 12.5 v2 M1.5 8 h2 M12.5 8 h2 M3.5 3.5 l1.4 1.4 M11.1 11.1 l1.4 1.4 M12.5 3.5 l-1.4 1.4 M4.9 11.1 l-1.4 1.4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        <svg width="13" height="13" viewBox="0 0 16 16"><path d="M4 6 L8 10 L12 6" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+    </div>
+    <!-- tabs -->
+    <div style="display: flex; align-items: center; gap: 4px; padding: 8px 10px 0; border-bottom: 1px solid #22262e;">
+      <div style="padding: 7px 11px; font-size: 11px; color: oklch(0.86 0.13 195); border-bottom: 2px solid oklch(0.82 0.15 195); margin-bottom: -1px;">Network</div>
+      <div style="padding: 7px 11px; font-size: 11px; color: #6b7280;">CPU</div>
+      <div style="padding: 7px 11px; font-size: 11px; color: #6b7280;">Memory</div>
+      <div style="padding: 7px 11px; font-size: 11px; color: #6b7280;">Console</div>
+      <div style="padding: 7px 11px; font-size: 11px; color: #6b7280;">Storage</div>
+    </div>
+    <!-- stat row -->
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); border-bottom: 1px solid #22262e;">
+      <div style="padding: 12px 14px; border-right: 1px solid #22262e;"><div style="font-size: 9px; letter-spacing: 0.12em; color: #5f6670;">REQUESTS</div><div style="font-size: 17px; color: #e6e8ea; margin-top: 3px;">47</div></div>
+      <div style="padding: 12px 14px; border-right: 1px solid #22262e;"><div style="font-size: 9px; letter-spacing: 0.12em; color: #5f6670;">TRANSFER</div><div style="font-size: 17px; color: #e6e8ea; margin-top: 3px;">1.2 <span style="font-size: 11px; color: #8a9099;">MB</span></div></div>
+      <div style="padding: 12px 14px;"><div style="font-size: 9px; letter-spacing: 0.12em; color: #5f6670;">DCL</div><div style="font-size: 17px; color: oklch(0.86 0.13 195); margin-top: 3px;">312 <span style="font-size: 11px; color: #8a9099;">ms</span></div></div>
+    </div>
+    <!-- throughput sparkline -->
+    <div style="position: relative; padding: 12px 14px 6px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+        <span style="font-size: 9.5px; letter-spacing: 0.1em; color: #6b7280;">THROUGHPUT</span>
+        <span style="font-size: 11px; color: oklch(0.86 0.13 195);">2.4 Mbps</span>
+      </div>
+      <svg viewBox="0 0 424 64" style="width: 100%; height: 64px;" preserveAspectRatio="none">
+        <defs><linearGradient id="tp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="oklch(0.82 0.15 195)" stop-opacity="0.28"/><stop offset="1" stop-color="oklch(0.82 0.15 195)" stop-opacity="0"/></linearGradient></defs>
+        <line x1="0" y1="16" x2="424" y2="16" stroke="#20242c" stroke-width="1"/>
+        <line x1="0" y1="40" x2="424" y2="40" stroke="#20242c" stroke-width="1"/>
+        <path d="M0 50 L30 44 L52 52 L80 30 L110 38 L140 20 L168 34 L200 12 L230 40 L262 26 L292 46 L320 22 L350 36 L384 16 L410 28 L424 20 L424 64 L0 64 Z" fill="url(#tp)"/>
+        <path d="M0 50 L30 44 L52 52 L80 30 L110 38 L140 20 L168 34 L200 12 L230 40 L262 26 L292 46 L320 22 L350 36 L384 16 L410 28 L424 20" fill="none" stroke="oklch(0.82 0.15 195)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <!-- request list -->
+    <div style="padding: 4px 4px 6px;">
+      <div style="display: grid; grid-template-columns: 1fr 46px 58px 48px; padding: 6px 12px; font-size: 9px; letter-spacing: 0.08em; color: #5f6670;">
+        <span>NAME</span><span style="text-align: right;">STATUS</span><span style="text-align: right;">SIZE</span><span style="text-align: right;">TIME</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 46px 58px 48px; padding: 7px 12px; font-size: 11px; color: #cfd3d9; border-radius: 6px;"><span style="color: #9aa1ab;">events</span><span style="text-align: right; color: oklch(0.82 0.15 150);">200</span><span style="text-align: right; color: #8a9099;">4.1 kB</span><span style="text-align: right; color: #8a9099;">18 ms</span></div>
+      <div style="display: grid; grid-template-columns: 1fr 46px 58px 48px; padding: 7px 12px; font-size: 11px; color: #cfd3d9; background: #14171c; border-radius: 6px;"><span style="color: #9aa1ab;">metrics.json</span><span style="text-align: right; color: oklch(0.82 0.15 150);">200</span><span style="text-align: right; color: #8a9099;">62 kB</span><span style="text-align: right; color: #8a9099;">41 ms</span></div>
+      <div style="display: grid; grid-template-columns: 1fr 46px 58px 48px; padding: 7px 12px; font-size: 11px; color: #cfd3d9; border-radius: 6px;"><span style="color: #9aa1ab;">app.js</span><span style="text-align: right; color: #6b7280;">304</span><span style="text-align: right; color: #8a9099;">—</span><span style="text-align: right; color: #8a9099;">3 ms</span></div>
+      <div style="display: grid; grid-template-columns: 1fr 46px 58px 48px; padding: 7px 12px; font-size: 11px; color: #cfd3d9; background: #14171c; border-radius: 6px;"><span style="color: #9aa1ab;">session</span><span style="text-align: right; color: oklch(0.7 0.19 25);">401</span><span style="text-align: right; color: #8a9099;">0.3 kB</span><span style="text-align: right; color: #8a9099;">22 ms</span></div>
+      <div style="display: grid; grid-template-columns: 1fr 46px 58px 48px; padding: 7px 12px; font-size: 11px; color: #cfd3d9; border-radius: 6px;"><span style="color: #9aa1ab;">avatar.webp</span><span style="text-align: right; color: oklch(0.82 0.15 150);">200</span><span style="text-align: right; color: #8a9099;">8.9 kB</span><span style="text-align: right; color: #8a9099;">12 ms</span></div>
+    </div>
+    <!-- footer -->
+    <div style="height: 34px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; border-top: 1px solid #22262e;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="width: 6px; height: 6px; border-radius: 50%; background: oklch(0.82 0.15 150); box-shadow: 0 0 7px oklch(0.82 0.15 150 / 0.8);"></span>
+        <span style="font-size: 10px; color: #8a9099;">CDP 1.3 · attached</span>
+      </div>
+      <span style="font-size: 10px; color: #6b7280;">heap 84 MB · 2 views</span>
+    </div>
+  </div>
+
+</div>
+
+<script data-dc-script data-props='{}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

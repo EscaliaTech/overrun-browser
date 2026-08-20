@@ -1,0 +1,13 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1440, "h": 900, "title": "Overrun — overlay open" },
+    { "file": "Collapsed.dc.html", "x": 1520, "y": 0, "w": 1440, "h": 900, "title": "Overlay collapsed" },
+    { "file": "Panels.dc.html", "x": 3040, "y": 0, "w": 780, "h": 900, "title": "Overlay — metric lenses" },
+    { "file": "Brand.dc.html", "x": 0, "y": 980, "w": 1080, "h": 760, "title": "Brand system" }
+  ],
+  "annotations": [
+    { "id": "note-thesis", "x": 0, "y": -96, "w": 460, "text": "El viewport es intocable: la pagina se renderiza a tamano completo y las DevTools viven en un panel flotante en la esquina. Colapsalo y la app queda 100% visible (board siguiente)." },
+    { "id": "note-brand", "x": 1180, "y": 1060, "w": 300, "text": "Dark terminal / dev-tech identity. Space Grotesk + JetBrains Mono, near-black surfaces, oklch cyan primary." }
+  ],
+  "launch": { "view": "canvas" }
+}
