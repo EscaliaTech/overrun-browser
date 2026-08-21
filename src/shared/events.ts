@@ -153,11 +153,36 @@ export interface PerformanceEvent extends OverrunEventBase {
 }
 
 // ---------------------------------------------------------------------------
+// Dominio: storage (v1 — REQ-024)
+//
+// Uso por tipo de almacenamiento del origen de la página. Se obtiene por COMANDO
+// (`Storage.getUsageAndQuota`) — el main lo sondea y emite snapshots.
+// ---------------------------------------------------------------------------
+
+export interface StorageBreakdown {
+  /** cookies, indexeddb, localstorage, cache_storage, service_workers… */
+  type: string
+  bytes: number
+}
+
+export interface StorageRecord {
+  origin: string
+  usage: number // bytes usados en total
+  quota: number // bytes disponibles
+  breakdown: StorageBreakdown[]
+}
+
+export interface StorageEvent extends OverrunEventBase {
+  domain: 'storage'
+  record: StorageRecord
+}
+
+// ---------------------------------------------------------------------------
 // Unión de todos los eventos del bus. Otros dominios se suman aquí sin rediseño.
 // ---------------------------------------------------------------------------
 
-export type OverrunEvent = NetworkEvent | ConsoleEvent | MemoryEvent | PerformanceEvent
-// | StorageEvent | SecurityEvent (próximas fases)
+export type OverrunEvent = NetworkEvent | ConsoleEvent | MemoryEvent | PerformanceEvent | StorageEvent
+// | SecurityEvent (v2)
 
 /** Canales IPC — un único punto para no tipear strings sueltos. */
 export const IPC = {

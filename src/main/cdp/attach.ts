@@ -3,6 +3,7 @@ import { handleCdpNetwork, resetNetwork } from '../events/network'
 import { handleCdpConsole } from '../events/console'
 import { createMemoryPoller } from '../events/memory'
 import { createPerformancePoller } from '../events/performance'
+import { createStoragePoller } from '../events/storage'
 
 // ============================================================================
 // Capa CDP (D-002) — DESACOPLADA de la base (REQ-062): si mañana se migra a
@@ -38,11 +39,13 @@ export function attachCdp(page: WebContents): () => void {
 
   const memory = createMemoryPoller(dbg)
   const performance = createPerformancePoller(dbg)
+  const storage = createStoragePoller(dbg, page)
 
   const onDetach = (_event: unknown, reason: string): void => {
     console.warn('[cdp] debugger detached:', reason)
     memory.stop()
     performance.stop()
+    storage.stop()
   }
   dbg.on('detach', onDetach)
 
@@ -52,9 +55,10 @@ export function attachCdp(page: WebContents): () => void {
   dbg.sendCommand('Log.enable').catch((e) => console.error('[cdp] Log.enable', e))
   dbg.sendCommand('Performance.enable').catch((e) => console.error('[cdp] Performance.enable', e))
 
-  // Sondeos periódicos (REQ-022 / REQ-023).
+  // Sondeos periódicos (REQ-022 / REQ-023 / REQ-024).
   memory.start()
   performance.start()
+  storage.start()
 
   // Al navegar a otra página, limpiamos el estado de red acumulado.
   const onNavigation = (_e: unknown, _url: string, isInPlace: boolean, isMainFrame: boolean): void => {
@@ -65,6 +69,7 @@ export function attachCdp(page: WebContents): () => void {
   return () => {
     memory.stop()
     performance.stop()
+    storage.stop()
     dbg.off('message', onMessage)
     dbg.off('detach', onDetach)
     if (!page.isDestroyed()) page.off('did-start-navigation', onNavigation)
