@@ -447,19 +447,33 @@ function registerIpc(): void {
       }
     }
 
+    // Todas las cookies del navegador filtradas al host del sitio (incluye httpOnly,
+    // que `document.cookie` no ve). `Storage.getCookies` es más fiable que el de Network.
+    let host = ''
+    try {
+      host = new URL(url).hostname
+    } catch {
+      host = ''
+    }
+    const domainMatches = (cookieDomain: string): boolean => {
+      const d = cookieDomain.replace(/^\./, '')
+      return host === d || host.endsWith('.' + d)
+    }
     const cookies = await dbg
-      .sendCommand('Network.getCookies', { urls: [url] })
+      .sendCommand('Storage.getCookies', {})
       .then((r) =>
-        ((r as { cookies: any[] }).cookies ?? []).map((c) => ({
-          name: c.name,
-          value: c.value,
-          domain: c.domain,
-          path: c.path,
-          size: c.size ?? c.name.length + String(c.value).length,
-          httpOnly: !!c.httpOnly,
-          secure: !!c.secure,
-          expires: c.expires ?? -1
-        }))
+        ((r as { cookies: any[] }).cookies ?? [])
+          .filter((c) => domainMatches(c.domain))
+          .map((c) => ({
+            name: c.name,
+            value: c.value,
+            domain: c.domain,
+            path: c.path,
+            size: c.size ?? c.name.length + String(c.value).length,
+            httpOnly: !!c.httpOnly,
+            secure: !!c.secure,
+            expires: c.expires ?? -1
+          }))
       )
       .catch(() => [])
 
