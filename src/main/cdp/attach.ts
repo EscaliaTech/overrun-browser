@@ -54,6 +54,7 @@ export function attachCdp(page: WebContents): () => void {
   dbg.sendCommand('Runtime.enable').catch((e) => console.error('[cdp] Runtime.enable', e))
   dbg.sendCommand('Log.enable').catch((e) => console.error('[cdp] Log.enable', e))
   dbg.sendCommand('Performance.enable').catch((e) => console.error('[cdp] Performance.enable', e))
+  dbg.sendCommand('DOMStorage.enable').catch((e) => console.error('[cdp] DOMStorage.enable', e))
 
   // Sondeos periódicos (REQ-022 / REQ-023 / REQ-024).
   memory.start()
