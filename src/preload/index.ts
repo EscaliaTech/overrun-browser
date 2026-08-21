@@ -11,7 +11,9 @@ import {
   type HistoryState,
   type StorageDetail,
   type ViewportState,
-  type ViewportSet
+  type ViewportSet,
+  type FindQuery,
+  type FindResult
 } from '../shared/events'
 
 // ============================================================================
@@ -100,6 +102,24 @@ const api = {
     const listener = (): void => fn()
     ipcRenderer.on(IPC.focusAddress, listener)
     return () => ipcRenderer.off(IPC.focusAddress, listener)
+  },
+
+  // ---- chrome: find in page (Ctrl+F) ----
+  findQuery(q: FindQuery): void {
+    ipcRenderer.send(IPC.findQuery, q)
+  },
+  findStop(): void {
+    ipcRenderer.send(IPC.findStop)
+  },
+  onFindShow(fn: () => void): () => void {
+    const listener = (): void => fn()
+    ipcRenderer.on(IPC.findShow, listener)
+    return () => ipcRenderer.off(IPC.findShow, listener)
+  },
+  onFindResult(fn: (r: FindResult) => void): () => void {
+    const listener = (_e: unknown, r: FindResult): void => fn(r)
+    ipcRenderer.on(IPC.findResult, listener)
+    return () => ipcRenderer.off(IPC.findResult, listener)
   },
 
   // ---- overlay: control de estado (colapsar / expandir) (D-017) ----

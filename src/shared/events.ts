@@ -270,7 +270,17 @@ export const IPC = {
 
   // ---- atajos de teclado ----
   /** main → chrome: enfocar la barra de direcciones (Ctrl+L). */
-  focusAddress: 'overrun:focus-address'
+  focusAddress: 'overrun:focus-address',
+
+  // ---- find in page (Ctrl+F) ----
+  /** main → chrome: mostrar/enfocar la barra de búsqueda (Ctrl+F). */
+  findShow: 'overrun:find-show',
+  /** chrome → main: buscar texto en la página activa. */
+  findQuery: 'overrun:find-query',
+  /** main → chrome: resultado de la búsqueda (coincidencias, activa). */
+  findResult: 'overrun:find-result',
+  /** chrome → main: cerrar la búsqueda (limpia el resaltado). */
+  findStop: 'overrun:find-stop'
 } as const
 
 export interface ResponseBody {
@@ -381,6 +391,26 @@ export interface ViewportSet {
   width?: number
   height?: number
   landscape?: boolean
+}
+
+// ---------------------------------------------------------------------------
+// Find in page (Ctrl+F) — webContents.findInPage sobre la página activa.
+// ---------------------------------------------------------------------------
+
+export interface FindQuery {
+  text: string
+  /** dirección de la búsqueda. */
+  forward: boolean
+  /** false = búsqueda incremental (mientras se escribe); true = saltar a la siguiente. */
+  findNext: boolean
+  matchCase: boolean
+}
+
+export interface FindResult {
+  /** total de coincidencias. */
+  matches: number
+  /** ordinal de la coincidencia activa (1-based; 0 si no hay). */
+  active: number
 }
 
 export interface NavState {
