@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { NavState, TabsState, BookmarksState } from '../../shared/events'
+import type { NavState, TabsState, BookmarksState, HistoryEntry } from '../../shared/events'
 
 // Barra + tabs de Overrun (chromeView). Frameless propio (BRANDING), no la UI de Chrome.
 export function Chrome(): JSX.Element {
@@ -7,8 +7,8 @@ export function Chrome(): JSX.Element {
   const [draft, setDraft] = useState('')
   const [tabs, setTabs] = useState<TabsState>({ tabs: [], activeId: '' })
   const [marks, setMarks] = useState<BookmarksState>({ items: [], barVisible: false, currentSaved: false })
-  // Histórico de las últimas 5 búsquedas/URLs (sesión; el chrome no se recarga).
-  const [history, setHistory] = useState<string[]>([])
+  // Historial completo persistido (viene del main); alimenta el autocompletado.
+  const [history, setHistory] = useState<HistoryEntry[]>([])
   const [showHist, setShowHist] = useState(false)
 
   useEffect(() => window.overrun.onNavState((s) => {
@@ -17,17 +17,21 @@ export function Chrome(): JSX.Element {
   }), [])
   useEffect(() => window.overrun.onTabsState(setTabs), [])
   useEffect(() => window.overrun.onBookmarksState(setMarks), [])
+  useEffect(() => window.overrun.onHistoryState((s) => setHistory(s.items)), [])
 
   const navigateTo = (raw: string): void => {
     const url = raw.trim()
     if (!url) return
-    window.overrun.navigate(url)
-    setHistory((h) => [url, ...h.filter((u) => u !== url)].slice(0, 5))
+    window.overrun.navigate(url) // el main registra la visita en el historial persistido
     setShowHist(false)
   }
   const go = (): void => navigateTo(draft)
 
-  const suggestions = history.filter((u) => draft.trim() === '' || u.toLowerCase().includes(draft.toLowerCase()))
+  // Autocompletado contra TODO el historial (url o título), no solo lo reciente.
+  const q = draft.trim().toLowerCase()
+  const suggestions = history
+    .filter((e) => q === '' || e.url.toLowerCase().includes(q) || e.title.toLowerCase().includes(q))
+    .slice(0, 8)
 
   // El dropdown se recorta por los bounds del chromeView; cuando está visible se
   // expande la vista del chrome a toda la ventana (transparente) para que flote.
@@ -103,9 +107,9 @@ export function Chrome(): JSX.Element {
           />
           {showHist && suggestions.length > 0 && (
             <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 30, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 9, overflow: 'hidden', boxShadow: '0 18px 44px -14px rgba(0,0,0,0.7)' }}>
-              <div style={{ padding: '7px 12px 3px', fontSize: 9, letterSpacing: '0.12em', color: 'var(--mute)', fontFamily: 'var(--font-mono)' }}>RECIENTES</div>
-              {suggestions.map((u) => (
-                <HistRow key={u} url={u} onPick={() => navigateTo(u)} />
+              <div style={{ padding: '7px 12px 3px', fontSize: 9, letterSpacing: '0.12em', color: 'var(--mute)', fontFamily: 'var(--font-mono)' }}>{q === '' ? 'RECIENTES' : 'HISTORIAL'}</div>
+              {suggestions.map((e) => (
+                <HistRow key={e.url} entry={e} onPick={() => navigateTo(e.url)} />
               ))}
             </div>
           )}
@@ -182,20 +186,23 @@ function BarToggle({ active, onClick }: { active: boolean; onClick: () => void }
   )
 }
 
-// Fila del historial: hover en paleta; onMouseDown navega antes del blur del input.
-function HistRow({ url, onPick }: { url: string; onPick: () => void }): JSX.Element {
+// Fila del historial: título + url; hover en paleta; onMouseDown navega antes del blur.
+function HistRow({ entry, onPick }: { entry: HistoryEntry; onPick: () => void }): JSX.Element {
   const [hover, setHover] = useState(false)
   return (
     <div
       onMouseDown={(e) => { e.preventDefault(); onPick() }}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 12px', cursor: 'pointer', background: hover ? 'oklch(0.82 0.15 195 / 0.1)' : 'transparent' }}>
+      style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '6px 12px', cursor: 'pointer', background: hover ? 'oklch(0.82 0.15 195 / 0.1)' : 'transparent' }}>
       <svg width="12" height="12" viewBox="0 0 16 16" style={{ flexShrink: 0, color: hover ? 'var(--cyan-bright)' : 'var(--mute)' }}>
         <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.3" fill="none" />
         <path d="M8 5 V8 L10 9.5" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: hover ? '#e6e9ee' : '#cfd3d9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{url}</span>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: hover ? '#e6e9ee' : '#cfd3d9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.title}</div>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--mute)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.url}</div>
+      </div>
     </div>
   )
 }
