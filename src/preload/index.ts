@@ -7,7 +7,8 @@ import {
   type OverrunEvent,
   type ResponseBody,
   type TabsState,
-  type BookmarksState
+  type BookmarksState,
+  type HistoryState
 } from '../shared/events'
 
 // ============================================================================
@@ -69,6 +70,16 @@ const api = {
     const listener = (_e: unknown, state: BookmarksState): void => fn(state)
     ipcRenderer.on(IPC.bookmarksState, listener)
     return () => ipcRenderer.off(IPC.bookmarksState, listener)
+  },
+
+  // ---- chrome: historial ----
+  historyClear(): void {
+    ipcRenderer.send(IPC.historyClear)
+  },
+  onHistoryState(fn: (state: HistoryState) => void): () => void {
+    const listener = (_e: unknown, state: HistoryState): void => fn(state)
+    ipcRenderer.on(IPC.historyState, listener)
+    return () => ipcRenderer.off(IPC.historyState, listener)
   },
 
   // ---- overlay: control de estado (colapsar / expandir) (D-017) ----

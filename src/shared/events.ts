@@ -228,7 +228,13 @@ export const IPC = {
   /** chrome → main: quitar un bookmark por id. */
   bookmarkRemove: 'overrun:bookmark-remove',
   /** chrome → main: mostrar/ocultar la barra de bookmarks (retráctil). */
-  bookmarksBarToggle: 'overrun:bookmarks-bar-toggle'
+  bookmarksBarToggle: 'overrun:bookmarks-bar-toggle',
+
+  // ---- historial ----
+  /** main → chrome: visitas recientes (persistidas) para sugerencias de la barra. */
+  historyState: 'overrun:history-state',
+  /** chrome → main: limpiar el historial persistido. */
+  historyClear: 'overrun:history-clear'
 } as const
 
 export interface ResponseBody {
@@ -261,6 +267,16 @@ export interface BookmarksState {
   barVisible: boolean
   /** la URL de la pestaña activa ya está guardada (estrella llena). */
   currentSaved: boolean
+}
+
+export interface HistoryEntry {
+  url: string
+  title: string
+  ts: number
+}
+
+export interface HistoryState {
+  items: HistoryEntry[]
 }
 
 export interface Viewport {

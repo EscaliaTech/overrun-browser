@@ -10,7 +10,8 @@ import {
   type OverlayControl,
   type ResponseBody,
   type TabsState,
-  type BookmarksState
+  type BookmarksState,
+  type HistoryState
 } from '../shared/events'
 import {
   listBookmarks,
@@ -20,6 +21,8 @@ import {
   removeBookmark,
   toggleBar
 } from './bookmarks'
+import { addVisit, recentVisits, clearHistory } from './history'
+import { loadSession, saveSession } from './session'
 
 // ============================================================================
 // Ventana Overrun — arquitectura de dos superficies apiladas (D-003 / REQ-010,014):
@@ -162,6 +165,24 @@ function sendBookmarks(): void {
   chromeView.webContents.send(IPC.bookmarksState, state)
 }
 
+// Historial completo persistido → chrome (para autocompletar contra TODO lo
+// visitado, no solo lo reciente: escribir "you" sugiere youtube aunque sea viejo).
+function sendHistory(): void {
+  const state: HistoryState = { items: recentVisits(300) }
+  chromeView.webContents.send(IPC.historyState, state)
+}
+
+// Persiste las pestañas abiertas (URLs + activa). No guarda durante el arranque
+// (antes de restaurar) para no pisar la sesión con una lista vacía.
+let restoring = true
+function storeSession(): void {
+  if (restoring) return
+  saveSession({
+    tabs: tabs.map((t) => t.view.webContents.getURL()),
+    activeIndex: Math.max(0, tabs.findIndex((t) => t.id === activeId))
+  })
+}
+
 // Listeners de navegación de una pestaña: refrescan la tira de tabs y, si es la
 // activa, el estado de navegación y de bookmarks (la estrella depende de la URL).
 function wireTabEvents(tab: Tab): void {
@@ -173,8 +194,13 @@ function wireTabEvents(tab: Tab): void {
       sendBookmarks()
     }
   }
-  wc.on('page-title-updated', update)
-  wc.on('did-navigate', update)
+  const record = (): void => {
+    addVisit(wc.getURL(), wc.getTitle())
+    sendHistory()
+    storeSession() // la URL de la pestaña cambió
+  }
+  wc.on('page-title-updated', () => { update(); addVisit(wc.getURL(), wc.getTitle()); sendHistory() })
+  wc.on('did-navigate', () => { update(); record() })
   wc.on('did-navigate-in-page', update)
   wc.on('did-start-loading', update)
   wc.on('did-stop-loading', update)
@@ -194,6 +220,7 @@ function createTab(url: string = START_URL, activate = true): void {
   view.webContents.loadURL(normUrl(url)).catch((err) => console.error('[nav]', err))
   if (activate) activateTab(tab.id)
   else sendTabs()
+  storeSession()
 }
 
 function activateTab(id: string): void {
@@ -219,6 +246,8 @@ function activateTab(id: string): void {
   sendTabs()
   sendNavState()
   sendBookmarks()
+  sendHistory()
+  storeSession()
 }
 
 function closeTab(id: string): void {
@@ -247,6 +276,7 @@ function closeTab(id: string): void {
   } else {
     sendTabs()
   }
+  storeSession()
 }
 
 export function createWindow(): void {
@@ -283,11 +313,13 @@ export function createWindow(): void {
   overlayView.webContents.on('did-finish-load', () =>
     overlayView.webContents.send(IPC.overlayState, overlayCollapsed)
   )
-  // Manda el estado inicial (tabs, url, bookmarks) al chrome cuando carga.
+  // Reenvía el estado completo al chrome cada vez que carga (incluye HMR/reload en
+  // dev) → la tira de tabs no queda vacía tras un reload del renderer.
   chromeView.webContents.on('did-finish-load', () => {
     sendTabs()
     sendNavState()
     sendBookmarks()
+    sendHistory()
   })
 
   // Bus → overlay (IPC). Único puente main→UI de observabilidad.
@@ -298,13 +330,27 @@ export function createWindow(): void {
     sendNavState() // la resolución cambió
   })
 
-  // Primera pestaña (adjunta CDP sobre la página, D-002).
-  createTab(START_URL)
+  // Restaura la sesión: reabre las pestañas que estaban abiertas (o una nueva).
+  const s = loadSession()
+  if (s.tabs.length > 0) {
+    s.tabs.forEach((u) => createTab(/^https?:/i.test(u) ? u : START_URL, false))
+    const target = tabs[s.activeIndex] ?? tabs[0]
+    if (target) activateTab(target.id)
+  } else {
+    createTab(START_URL)
+  }
+  restoring = false // a partir de acá, los cambios sí se persisten
+  storeSession()
   layout()
   registerIpc()
 }
 
 function registerIpc(): void {
+  ipcMain.on(IPC.historyClear, () => {
+    clearHistory()
+    sendHistory()
+  })
+
   // Expande/contrae el chrome para popups que deben flotar sobre la página.
   ipcMain.on(IPC.chromeExpand, (_e, open: boolean) => {
     chromeExpanded = open
