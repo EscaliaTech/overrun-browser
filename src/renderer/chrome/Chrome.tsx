@@ -29,11 +29,17 @@ export function Chrome(): JSX.Element {
 
   const suggestions = history.filter((u) => draft.trim() === '' || u.toLowerCase().includes(draft.toLowerCase()))
 
+  // El dropdown se recorta por los bounds del chromeView; cuando está visible se
+  // expande la vista del chrome a toda la ventana (transparente) para que flote.
+  useEffect(() => {
+    window.overrun.chromeExpand(showHist && suggestions.length > 0)
+  }, [showHist, suggestions.length])
+
   return (
-    <div style={{ height: '100%', background: 'var(--void)', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* tab strip — zona de arrastre de la ventana (frameless); el padding
           derecho reserva el hueco de los controles nativos (overlay). */}
-      <div style={{ height: 40, display: 'flex', alignItems: 'center', gap: 10, padding: '0 140px 0 14px', borderBottom: '1px solid var(--line-soft)', WebkitAppRegion: 'drag' }}>
+      <div style={{ height: 40, display: 'flex', alignItems: 'center', gap: 10, padding: '0 140px 0 14px', background: 'var(--void)', WebkitAppRegion: 'drag' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 9, WebkitAppRegion: 'no-drag' }}>
           <div style={{ width: 22, height: 22, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#101318', border: '1px solid #2a3038', boxShadow: '0 0 14px -4px oklch(0.82 0.15 195 / 0.5)' }}>
             <svg width="13" height="13" viewBox="0 0 14 14"><path d="M4.2 3.1 L11 7 L4.2 10.9 Z" fill="var(--cyan)" /></svg>
@@ -75,7 +81,7 @@ export function Chrome(): JSX.Element {
       </div>
 
       {/* toolbar */}
-      <div style={{ height: 52, display: 'flex', alignItems: 'center', gap: 12, padding: '0 14px', borderBottom: '1px solid var(--line-soft)', background: '#0c0e12' }}>
+      <div style={{ height: 52, display: 'flex', alignItems: 'center', gap: 12, padding: '0 14px', borderBottom: '1px solid var(--line-soft)', background: 'var(--surface-2)' }}>
         <div style={{ display: 'flex', gap: 2 }}>
           <NavBtn onClick={() => window.overrun.navAction('back')} disabled={!nav.canGoBack} d="M10 3 L5 8 L10 13" />
           <NavBtn onClick={() => window.overrun.navAction('forward')} disabled={!nav.canGoForward} d="M6 3 L11 8 L6 13" />

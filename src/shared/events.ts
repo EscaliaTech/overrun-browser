@@ -179,6 +179,9 @@ export const IPC = {
   overlayResize: 'overrun:overlay-resize',
   /** overlay → main (invoke): pide el body de una respuesta on-demand. */
   getResponseBody: 'overrun:get-response-body',
+  /** chrome → main: expandir/contraer la vista del chrome para que un popup
+   *  (dropdown de historial) pueda dibujarse sobre la página sin recortarse. */
+  chromeExpand: 'overrun:chrome-expand',
 
   // ---- pestañas (multi-tab) ----
   /** main → chrome: lista de pestañas + cuál está activa. */

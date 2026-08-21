@@ -84,6 +84,9 @@ const api = {
   getResponseBody(requestId: string): Promise<ResponseBody> {
     return ipcRenderer.invoke(IPC.getResponseBody, requestId)
   },
+  chromeExpand(open: boolean): void {
+    ipcRenderer.send(IPC.chromeExpand, open)
+  },
   onOverlayState(fn: (collapsed: boolean) => void): () => void {
     const listener = (_e: unknown, collapsed: boolean): void => fn(collapsed)
     ipcRenderer.on(IPC.overlayState, listener)
