@@ -5,7 +5,8 @@ import {
   type TabsState,
   type BookmarksState,
   type HistoryEntry,
-  type ViewportState
+  type ViewportState,
+  type FindResult
 } from '../../shared/events'
 
 // Barra + tabs de Overrun (chromeView). Frameless propio (BRANDING), no la UI de Chrome.
@@ -19,6 +20,7 @@ export function Chrome(): JSX.Element {
   const [showHist, setShowHist] = useState(false)
   const [vp, setVp] = useState<ViewportState>({ presetId: null, width: 0, height: 0, dpr: 1, mobile: false, landscape: false, clamped: false })
   const [vpMenu, setVpMenu] = useState(false)
+  const [findOpen, setFindOpen] = useState(false)
   const addrRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => window.overrun.onNavState((s) => {
@@ -34,6 +36,8 @@ export function Chrome(): JSX.Element {
     const el = addrRef.current
     if (el) { el.focus(); el.select() }
   }), [])
+  // Ctrl+F (desde el main): abre la barra de búsqueda.
+  useEffect(() => window.overrun.onFindShow(() => setFindOpen(true)), [])
 
   const navigateTo = (raw: string): void => {
     const url = raw.trim()
@@ -52,8 +56,8 @@ export function Chrome(): JSX.Element {
   // El dropdown se recorta por los bounds del chromeView; cuando está visible se
   // expande la vista del chrome a toda la ventana (transparente) para que flote.
   useEffect(() => {
-    window.overrun.chromeExpand((showHist && suggestions.length > 0) || vpMenu)
-  }, [showHist, suggestions.length, vpMenu])
+    window.overrun.chromeExpand((showHist && suggestions.length > 0) || vpMenu || findOpen)
+  }, [showHist, suggestions.length, vpMenu, findOpen])
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -167,7 +171,64 @@ export function Chrome(): JSX.Element {
           )}
         </div>
       )}
+
+      {/* barra de búsqueda en página (Ctrl+F) — flota sobre la página */}
+      {findOpen && <FindBar onClose={() => setFindOpen(false)} />}
     </div>
+  )
+}
+
+// Find in page: input + contador de coincidencias + prev/next + cerrar.
+// Búsqueda incremental al escribir; Enter = siguiente, Shift+Enter = anterior, Esc = cerrar.
+function FindBar({ onClose }: { onClose: () => void }): JSX.Element {
+  const [text, setText] = useState('')
+  const [res, setRes] = useState<FindResult>({ matches: 0, active: 0 })
+  const [matchCase, setMatchCase] = useState(false)
+  const ref = useRef<HTMLInputElement>(null)
+
+  useEffect(() => window.overrun.onFindResult(setRes), [])
+  useEffect(() => { ref.current?.focus(); ref.current?.select() }, [])
+
+  const query = (t: string, findNext: boolean, forward = true): void => {
+    window.overrun.findQuery({ text: t, forward, findNext, matchCase })
+  }
+  const onChange = (t: string): void => {
+    setText(t)
+    if (!t) setRes({ matches: 0, active: 0 })
+    query(t, false) // incremental
+  }
+  const close = (): void => { window.overrun.findStop(); onClose() }
+  const onKey = (e: React.KeyboardEvent): void => {
+    if (e.key === 'Enter') { e.preventDefault(); query(text, true, !e.shiftKey) }
+    else if (e.key === 'Escape') { e.preventDefault(); close() }
+  }
+  // Re-buscar si cambia match-case con texto presente.
+  useEffect(() => { if (text) query(text, false) }, [matchCase]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div style={{ position: 'fixed', top: 58, right: 18, zIndex: 40, display: 'flex', alignItems: 'center', gap: 6, height: 38, padding: '0 8px 0 12px', borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--line)', boxShadow: '0 18px 44px -14px rgba(0,0,0,0.7)', fontFamily: 'var(--font-mono)' }}>
+      <input ref={ref} value={text} onChange={(e) => onChange(e.target.value)} onKeyDown={onKey}
+        spellCheck={false} placeholder="Buscar en la página"
+        style={{ width: 190, height: 26, padding: '0 6px', background: 'transparent', border: 'none', color: '#cfd3d9', fontFamily: 'var(--font-mono)', fontSize: 12.5, outline: 'none', userSelect: 'text' }} />
+      <span style={{ fontSize: 11, color: res.matches ? 'var(--cyan-bright)' : 'var(--mute)', minWidth: 44, textAlign: 'right' }}>
+        {text ? `${res.active}/${res.matches}` : ''}
+      </span>
+      <button onClick={() => setMatchCase((v) => !v)} title="Distinguir mayúsculas"
+        style={{ width: 26, height: 26, borderRadius: 6, border: '1px solid', borderColor: matchCase ? 'oklch(0.82 0.15 195 / 0.5)' : 'var(--line)', background: matchCase ? 'oklch(0.82 0.15 195 / 0.14)' : 'transparent', color: matchCase ? 'var(--cyan-bright)' : 'var(--dim)', cursor: 'pointer', fontSize: 12 }}>Aa</button>
+      <FindNav d="M8 10 L4 6 h8 Z" title="Anterior (Shift+Enter)" onClick={() => query(text, true, false)} />
+      <FindNav d="M8 6 L12 10 H4 Z" title="Siguiente (Enter)" onClick={() => query(text, true, true)} />
+      <button onClick={close} title="Cerrar (Esc)"
+        style={{ width: 26, height: 26, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--dim)', cursor: 'pointer', fontSize: 15, lineHeight: 1 }}>×</button>
+    </div>
+  )
+}
+
+function FindNav({ d, title, onClick }: { d: string; title: string; onClick: () => void }): JSX.Element {
+  return (
+    <button onClick={onClick} title={title}
+      style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--dim)', cursor: 'pointer' }}>
+      <svg width="14" height="14" viewBox="0 0 16 16"><path d={d} fill="currentColor" /></svg>
+    </button>
   )
 }
 

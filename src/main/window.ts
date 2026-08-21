@@ -16,7 +16,8 @@ import {
   type StorageDetail,
   type StorageKV,
   type ViewportState,
-  type ViewportSet
+  type ViewportSet,
+  type FindQuery
 } from '../shared/events'
 import {
   listBookmarks,
@@ -285,6 +286,15 @@ function wireTabEvents(tab: Tab): void {
   wc.on('did-finish-load', () => {
     if (tab.id === activeId && viewport.presetId !== null) void applyEmulation(wc)
   })
+  // Resultado de find-in-page (Ctrl+F): reenviar a la barra si es la pestaña activa.
+  wc.on('found-in-page', (_e, result) => {
+    if (tab.id === activeId) {
+      chromeView.webContents.send(IPC.findResult, {
+        matches: result.matches ?? 0,
+        active: result.activeMatchOrdinal ?? 0
+      })
+    }
+  })
   attachShortcuts(wc)
 }
 
@@ -468,6 +478,22 @@ function registerIpc(): void {
 
   // ---- viewports / device modes ----
   ipcMain.on(IPC.viewportSet, (_e, p: ViewportSet) => setViewport(p))
+
+  // ---- find in page (Ctrl+F) ----
+  ipcMain.on(IPC.findQuery, (_e, q: FindQuery) => {
+    const wc = activeTab()?.view.webContents
+    if (!wc || wc.isDestroyed()) return
+    if (!q.text) {
+      wc.stopFindInPage('clearSelection')
+      chromeView.webContents.send(IPC.findResult, { matches: 0, active: 0 })
+      return
+    }
+    wc.findInPage(q.text, { forward: q.forward, findNext: q.findNext, matchCase: q.matchCase })
+  })
+  ipcMain.on(IPC.findStop, () => {
+    const wc = activeTab()?.view.webContents
+    if (wc && !wc.isDestroyed()) wc.stopFindInPage('clearSelection')
+  })
 
   // ---- bookmarks ----
   ipcMain.on(IPC.bookmarkToggle, () => {
@@ -671,6 +697,8 @@ function attachShortcuts(wc: WebContents): void {
     } else if (mod && !shift && key === 'p') {
       const w = page()
       if (w && !w.isDestroyed()) w.print()
+    } else if (mod && !shift && key === 'f') {
+      chromeView.webContents.send(IPC.findShow)
     } else handled = false
 
     if (handled) event.preventDefault()
