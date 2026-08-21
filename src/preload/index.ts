@@ -9,7 +9,9 @@ import {
   type TabsState,
   type BookmarksState,
   type HistoryState,
-  type StorageDetail
+  type StorageDetail,
+  type ViewportState,
+  type ViewportSet
 } from '../shared/events'
 
 // ============================================================================
@@ -81,6 +83,23 @@ const api = {
     const listener = (_e: unknown, state: HistoryState): void => fn(state)
     ipcRenderer.on(IPC.historyState, listener)
     return () => ipcRenderer.off(IPC.historyState, listener)
+  },
+
+  // ---- chrome: viewports / device modes ----
+  viewportSet(payload: ViewportSet): void {
+    ipcRenderer.send(IPC.viewportSet, payload)
+  },
+  onViewportState(fn: (state: ViewportState) => void): () => void {
+    const listener = (_e: unknown, state: ViewportState): void => fn(state)
+    ipcRenderer.on(IPC.viewportState, listener)
+    return () => ipcRenderer.off(IPC.viewportState, listener)
+  },
+
+  // ---- chrome: atajos (main → chrome: enfocar barra de direcciones) ----
+  onFocusAddress(fn: () => void): () => void {
+    const listener = (): void => fn()
+    ipcRenderer.on(IPC.focusAddress, listener)
+    return () => ipcRenderer.off(IPC.focusAddress, listener)
   },
 
   // ---- overlay: control de estado (colapsar / expandir) (D-017) ----

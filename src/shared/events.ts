@@ -260,7 +260,17 @@ export const IPC = {
   /** main → chrome: visitas recientes (persistidas) para sugerencias de la barra. */
   historyState: 'overrun:history-state',
   /** chrome → main: limpiar el historial persistido. */
-  historyClear: 'overrun:history-clear'
+  historyClear: 'overrun:history-clear',
+
+  // ---- viewports / device modes ----
+  /** main → chrome: viewport activo (preset, dims, orientación). */
+  viewportState: 'overrun:viewport-state',
+  /** chrome → main: fijar viewport (preset / custom / ajustar a ventana). */
+  viewportSet: 'overrun:viewport-set',
+
+  // ---- atajos de teclado ----
+  /** main → chrome: enfocar la barra de direcciones (Ctrl+L). */
+  focusAddress: 'overrun:focus-address'
 } as const
 
 export interface ResponseBody {
@@ -308,6 +318,69 @@ export interface HistoryState {
 export interface Viewport {
   width: number
   height: number
+}
+
+// ---------------------------------------------------------------------------
+// Viewports / device modes (v1 — REQ-025 / Emulation)
+//
+// El usuario testea la página a resoluciones concretas. `null` = ajustado a la
+// ventana (sin override). Un preset (o custom) redimensiona la vista de la página
+// a ese box y aplica CDP Emulation (DPR, touch, UA móvil) a la pestaña activa.
+// ---------------------------------------------------------------------------
+
+const UA_IOS =
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
+const UA_IPAD =
+  'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
+const UA_ANDROID =
+  'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'
+
+export interface DevicePreset {
+  id: string
+  label: string
+  /** dims lógicas en portrait (CSS px). */
+  w: number
+  h: number
+  /** device pixel ratio. */
+  dpr: number
+  /** emula touch + flag mobile en media queries. */
+  mobile: boolean
+  /** user-agent a forzar (solo presets móviles). */
+  ua?: string
+}
+
+/** Catálogo de dispositivos para el selector. Orden: móvil → tablet → desktop. */
+export const DEVICE_PRESETS: DevicePreset[] = [
+  { id: 'iphone-se', label: 'iPhone SE', w: 375, h: 667, dpr: 2, mobile: true, ua: UA_IOS },
+  { id: 'iphone-14', label: 'iPhone 14 Pro', w: 393, h: 852, dpr: 3, mobile: true, ua: UA_IOS },
+  { id: 'pixel-7', label: 'Pixel 7', w: 412, h: 915, dpr: 2.625, mobile: true, ua: UA_ANDROID },
+  { id: 'ipad-mini', label: 'iPad Mini', w: 768, h: 1024, dpr: 2, mobile: true, ua: UA_IPAD },
+  { id: 'ipad-pro', label: 'iPad Pro 11"', w: 834, h: 1194, dpr: 2, mobile: true, ua: UA_IPAD },
+  { id: 'laptop', label: 'Laptop', w: 1280, h: 800, dpr: 1, mobile: false },
+  { id: 'desktop', label: 'Desktop HD', w: 1920, h: 1080, dpr: 1, mobile: false }
+]
+
+export interface ViewportState {
+  /** id del preset, 'custom', o null = ajustado a la ventana. */
+  presetId: string | null
+  /** dims lógicas activas (0 cuando presetId === null). */
+  width: number
+  height: number
+  dpr: number
+  mobile: boolean
+  /** landscape = swap de w/h respecto al preset. */
+  landscape: boolean
+  /** el box no cabe entero en la ventana y quedó recortado. */
+  clamped: boolean
+}
+
+/** chrome → main: fijar viewport. presetId null = ajustar a ventana. */
+export interface ViewportSet {
+  presetId: string | null
+  /** solo para presetId 'custom'. */
+  width?: number
+  height?: number
+  landscape?: boolean
 }
 
 export interface NavState {

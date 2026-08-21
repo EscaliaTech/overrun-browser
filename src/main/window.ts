@@ -5,6 +5,7 @@ import { attachCdp } from './cdp/attach'
 import { bus } from './events/bus'
 import {
   IPC,
+  DEVICE_PRESETS,
   type NavAction,
   type NavState,
   type OverlayControl,
@@ -13,7 +14,9 @@ import {
   type BookmarksState,
   type HistoryState,
   type StorageDetail,
-  type StorageKV
+  type StorageKV,
+  type ViewportState,
+  type ViewportSet
 } from '../shared/events'
 import {
   listBookmarks,
@@ -81,6 +84,16 @@ let chromeExpanded = false
 // una vez arrastrado, queda fijo en {x,y} (top-left).
 let overlayPos: { x: number; y: number } | null = null
 
+// Viewport / device mode activo. presetId null = página ajustada a la ventana.
+let viewport: { presetId: string | null; w: number; h: number; dpr: number; mobile: boolean; ua?: string; landscape: boolean } = {
+  presetId: null,
+  w: 0,
+  h: 0,
+  dpr: 1,
+  mobile: false,
+  landscape: false
+}
+
 const clamp = (v: number, lo: number, hi: number): number => Math.min(Math.max(v, lo), Math.max(lo, hi))
 
 function activeTab(): Tab | undefined {
@@ -108,12 +121,27 @@ function cornerPos(width: number, height: number, o: { w: number; h: number }): 
   return { x: width - o.w - MARGIN, y: height - o.h - MARGIN }
 }
 
+// Box de la página según el viewport activo, dentro del área bajo el chrome.
+// Sin preset: llena el área. Con preset: box del device (swap si landscape),
+// centrado horizontalmente y recortado (clamp) si no cabe en la ventana.
+function viewportBox(width: number, availH: number): { x: number; w: number; h: number; clamped: boolean } {
+  if (viewport.presetId === null) return { x: 0, w: width, h: availH, clamped: false }
+  const dw = viewport.landscape ? viewport.h : viewport.w
+  const dh = viewport.landscape ? viewport.w : viewport.h
+  const w = Math.min(dw, width)
+  const h = Math.min(dh, availH)
+  return { x: Math.max(0, Math.floor((width - w) / 2)), w, h, clamped: w < dw || h < dh }
+}
+
 function layout(): void {
   const { width, height } = win.getContentBounds()
   const ch = chromeHeight()
   chromeView.setBounds({ x: 0, y: 0, width, height: chromeExpanded ? height : ch })
   const at = activeTab()
-  if (at) at.view.setBounds({ x: 0, y: ch, width, height: height - ch })
+  if (at) {
+    const box = viewportBox(width, height - ch)
+    at.view.setBounds({ x: box.x, y: ch, width: box.w, height: box.h })
+  }
 
   const o = overlayCollapsed ? OVERLAY_COLLAPSED : overlaySize
   const pos = overlayPos ?? cornerPos(width, height, o)
@@ -174,6 +202,52 @@ function sendHistory(): void {
   chromeView.webContents.send(IPC.historyState, state)
 }
 
+// Aplica (o limpia) la emulación de device en la pestaña activa vía CDP. Las dims
+// del override coinciden con el box realmente pintado (viewportBox) para que la
+// superficie y lo que ve la página no se desincronicen. Best-effort: si el
+// debugger no está adjunto o el comando falla, no rompe la navegación.
+async function applyEmulation(wc: WebContents): Promise<void> {
+  const dbg = wc.debugger
+  if (!dbg.isAttached()) return
+  try {
+    if (viewport.presetId === null) {
+      await dbg.sendCommand('Emulation.clearDeviceMetricsOverride')
+      await dbg.sendCommand('Emulation.setTouchEmulationEnabled', { enabled: false })
+      // getUserAgent() devuelve la UA de sesión (no la del override CDP): sirve para restaurar.
+      await dbg.sendCommand('Emulation.setUserAgentOverride', { userAgent: wc.getUserAgent() })
+      return
+    }
+    const { width, height } = win.getContentBounds()
+    const box = viewportBox(width, height - chromeHeight())
+    await dbg.sendCommand('Emulation.setDeviceMetricsOverride', {
+      width: box.w,
+      height: box.h,
+      deviceScaleFactor: viewport.dpr,
+      mobile: viewport.mobile
+    })
+    await dbg.sendCommand('Emulation.setTouchEmulationEnabled', { enabled: viewport.mobile })
+    await dbg.sendCommand('Emulation.setUserAgentOverride', { userAgent: viewport.ua || wc.getUserAgent() })
+  } catch (err) {
+    console.error('[emulation]', err)
+  }
+}
+
+function sendViewport(): void {
+  const state: ViewportState = {
+    presetId: viewport.presetId,
+    width: viewport.landscape ? viewport.h : viewport.w,
+    height: viewport.landscape ? viewport.w : viewport.h,
+    dpr: viewport.dpr,
+    mobile: viewport.mobile,
+    landscape: viewport.landscape,
+    clamped: (() => {
+      const { width, height } = win.getContentBounds()
+      return viewportBox(width, height - chromeHeight()).clamped
+    })()
+  }
+  chromeView.webContents.send(IPC.viewportState, state)
+}
+
 // Persiste las pestañas abiertas (URLs + activa). No guarda durante el arranque
 // (antes de restaurar) para no pisar la sesión con una lista vacía.
 let restoring = true
@@ -206,6 +280,12 @@ function wireTabEvents(tab: Tab): void {
   wc.on('did-navigate-in-page', update)
   wc.on('did-start-loading', update)
   wc.on('did-stop-loading', update)
+  // Una navegación completa resetea los overrides de Emulation: re-aplicar si esta
+  // pestaña es la activa y hay un device mode puesto.
+  wc.on('did-finish-load', () => {
+    if (tab.id === activeId && viewport.presetId !== null) void applyEmulation(wc)
+  })
+  attachShortcuts(wc)
 }
 
 function normUrl(url: string): string {
@@ -245,10 +325,12 @@ function activateTab(id: string): void {
   if (!next.disposeCdp) next.disposeCdp = attachCdp(next.view.webContents)
 
   layout()
+  void applyEmulation(next.view.webContents) // el device mode sigue a la pestaña activa
   sendTabs()
   sendNavState()
   sendBookmarks()
   sendHistory()
+  sendViewport()
   storeSession()
 }
 
@@ -322,7 +404,13 @@ export function createWindow(): void {
     sendNavState()
     sendBookmarks()
     sendHistory()
+    sendViewport()
   })
+
+  // Atajos globales: la barra propia y el overlay también deben responder cuando
+  // tienen el foco (no solo la página). Las pestañas se enganchan en wireTabEvents.
+  attachShortcuts(chromeView.webContents)
+  attachShortcuts(overlayView.webContents)
 
   // Bus → overlay (IPC). Único puente main→UI de observabilidad.
   bus.onEvent((evt) => overlayView.webContents.send(IPC.event, evt))
@@ -377,6 +465,9 @@ function registerIpc(): void {
   ipcMain.on(IPC.tabNew, () => createTab(START_URL))
   ipcMain.on(IPC.tabClose, (_e, id: string) => closeTab(id))
   ipcMain.on(IPC.tabActivate, (_e, id: string) => activateTab(id))
+
+  // ---- viewports / device modes ----
+  ipcMain.on(IPC.viewportSet, (_e, p: ViewportSet) => setViewport(p))
 
   // ---- bookmarks ----
   ipcMain.on(IPC.bookmarkToggle, () => {
@@ -504,6 +595,85 @@ function registerIpc(): void {
     overlayPos = { x: cur.x + (overlaySize.w - newW), y: cur.y + (overlaySize.h - newH) }
     overlaySize = { w: newW, h: newH }
     layout()
+  })
+}
+
+// Resuelve un preset/custom/fit → estado de viewport, relayoutea y re-emula.
+function setViewport(p: ViewportSet): void {
+  if (p.presetId === null) {
+    viewport = { presetId: null, w: 0, h: 0, dpr: 1, mobile: false, landscape: false }
+  } else if (p.presetId === 'custom') {
+    viewport = {
+      presetId: 'custom',
+      w: clamp(Math.round(p.width ?? 0), 200, 4000),
+      h: clamp(Math.round(p.height ?? 0), 200, 4000),
+      dpr: 1,
+      mobile: false,
+      landscape: !!p.landscape
+    }
+  } else {
+    const preset = DEVICE_PRESETS.find((d) => d.id === p.presetId)
+    if (!preset) return
+    viewport = {
+      presetId: preset.id,
+      w: preset.w,
+      h: preset.h,
+      dpr: preset.dpr,
+      mobile: preset.mobile,
+      ua: preset.ua,
+      landscape: !!p.landscape
+    }
+  }
+  layout()
+  const wc = activeTab()?.view.webContents
+  if (wc) void applyEmulation(wc)
+  sendViewport()
+  sendNavState() // las dims del viewport cambiaron
+}
+
+// ---- atajos de teclado (before-input-event, REQ-026) ----
+// Se engancha a cada webContents (chrome, overlay y cada página): el atajo responde
+// tenga el foco donde tenga. preventDefault evita que Chromium también lo procese.
+function cycleTab(dir: 1 | -1): void {
+  if (tabs.length < 2) return
+  const i = tabs.findIndex((t) => t.id === activeId)
+  activateTab(tabs[(i + dir + tabs.length) % tabs.length].id)
+}
+function activateByIndex(n: number): void {
+  // 1..8 → esa pestaña; 9 → última (convención de navegadores).
+  const idx = n === 9 ? tabs.length - 1 : n - 1
+  if (idx >= 0 && idx < tabs.length) activateTab(tabs[idx].id)
+}
+function attachShortcuts(wc: WebContents): void {
+  wc.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return
+    const mod = input.control || input.meta
+    const shift = input.shift
+    const key = input.key.toLowerCase()
+    const page = (): WebContents | undefined => activeTab()?.view.webContents
+    let handled = true
+
+    if (key === 'f5' || (mod && !shift && key === 'r')) page()?.reload()
+    else if (mod && shift && key === 'r') page()?.reloadIgnoringCache()
+    else if (mod && !shift && key === 't') createTab(START_URL)
+    else if (mod && !shift && key === 'w') closeTab(activeId)
+    else if (mod && key === 'tab') cycleTab(shift ? -1 : 1)
+    else if (mod && !shift && /^[1-9]$/.test(key)) activateByIndex(Number(key))
+    else if ((mod && key === 'l') || (input.alt && key === 'd')) chromeView.webContents.send(IPC.focusAddress)
+    else if (mod && !shift && key === 'd') {
+      const w = page()
+      if (w) { toggleBookmark(w.getURL(), w.getTitle()); sendBookmarks() }
+    } else if (mod && !shift && key === 'b') { toggleBar(); layout(); sendBookmarks() }
+    else if (mod && shift && key === 'o') {
+      overlayCollapsed = !overlayCollapsed
+      layout()
+      overlayView.webContents.send(IPC.overlayState, overlayCollapsed)
+    } else if (mod && !shift && key === 'p') {
+      const w = page()
+      if (w && !w.isDestroyed()) w.print()
+    } else handled = false
+
+    if (handled) event.preventDefault()
   })
 }
 
