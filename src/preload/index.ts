@@ -8,7 +8,8 @@ import {
   type ResponseBody,
   type TabsState,
   type BookmarksState,
-  type HistoryState
+  type HistoryState,
+  type StorageDetail
 } from '../shared/events'
 
 // ============================================================================
@@ -94,6 +95,9 @@ const api = {
   },
   getResponseBody(requestId: string): Promise<ResponseBody> {
     return ipcRenderer.invoke(IPC.getResponseBody, requestId)
+  },
+  getStorageDetail(): Promise<StorageDetail> {
+    return ipcRenderer.invoke(IPC.getStorageDetail)
   },
   chromeExpand(open: boolean): void {
     ipcRenderer.send(IPC.chromeExpand, open)

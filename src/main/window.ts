@@ -11,7 +11,9 @@ import {
   type ResponseBody,
   type TabsState,
   type BookmarksState,
-  type HistoryState
+  type HistoryState,
+  type StorageDetail,
+  type StorageKV
 } from '../shared/events'
 import {
   listBookmarks,
@@ -417,6 +419,52 @@ function registerIpc(): void {
     } catch (err) {
       return { body: `— no disponible (${(err as Error).message}) —`, base64: false }
     }
+  })
+
+  // Detalle de storage del origen activo (cookies + items de local/session storage).
+  ipcMain.handle(IPC.getStorageDetail, async (): Promise<StorageDetail> => {
+    const empty: StorageDetail = { origin: '', cookies: [], local: [], session: [] }
+    const wc = activeTab()?.view.webContents
+    if (!wc) return empty
+    const url = wc.getURL()
+    let origin = ''
+    try {
+      origin = new URL(url).origin
+    } catch {
+      return empty
+    }
+    if (!/^https?:/.test(origin)) return { ...empty, origin }
+    const dbg = wc.debugger
+
+    const getDom = async (isLocal: boolean): Promise<StorageKV[]> => {
+      try {
+        const r = (await dbg.sendCommand('DOMStorage.getDOMStorageItems', {
+          storageId: { securityOrigin: origin, isLocalStorage: isLocal }
+        })) as { entries: [string, string][] }
+        return (r.entries ?? []).map(([key, value]) => ({ key, value }))
+      } catch {
+        return []
+      }
+    }
+
+    const cookies = await dbg
+      .sendCommand('Network.getCookies', { urls: [url] })
+      .then((r) =>
+        ((r as { cookies: any[] }).cookies ?? []).map((c) => ({
+          name: c.name,
+          value: c.value,
+          domain: c.domain,
+          path: c.path,
+          size: c.size ?? c.name.length + String(c.value).length,
+          httpOnly: !!c.httpOnly,
+          secure: !!c.secure,
+          expires: c.expires ?? -1
+        }))
+      )
+      .catch(() => [])
+
+    const [local, session] = await Promise.all([getDom(true), getDom(false)])
+    return { origin, cookies, local, session }
   })
 
   // Arrastre del overlay: acumula deltas de pantalla sobre la posición actual.

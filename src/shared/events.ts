@@ -177,6 +177,30 @@ export interface StorageEvent extends OverrunEventBase {
   record: StorageRecord
 }
 
+// Detalle on-demand del storage del origen activo (entradas reales, no solo tamaño).
+export interface CookieInfo {
+  name: string
+  value: string
+  domain: string
+  path: string
+  size: number
+  httpOnly: boolean
+  secure: boolean
+  expires: number // -1 = sesión
+}
+
+export interface StorageKV {
+  key: string
+  value: string
+}
+
+export interface StorageDetail {
+  origin: string
+  cookies: CookieInfo[]
+  local: StorageKV[]
+  session: StorageKV[]
+}
+
 // ---------------------------------------------------------------------------
 // Unión de todos los eventos del bus. Otros dominios se suman aquí sin rediseño.
 // ---------------------------------------------------------------------------
@@ -204,6 +228,8 @@ export const IPC = {
   overlayResize: 'overrun:overlay-resize',
   /** overlay → main (invoke): pide el body de una respuesta on-demand. */
   getResponseBody: 'overrun:get-response-body',
+  /** overlay → main (invoke): detalle de storage del origen activo (cookies, items). */
+  getStorageDetail: 'overrun:get-storage-detail',
   /** chrome → main: expandir/contraer la vista del chrome para que un popup
    *  (dropdown de historial) pueda dibujarse sobre la página sin recortarse. */
   chromeExpand: 'overrun:chrome-expand',
