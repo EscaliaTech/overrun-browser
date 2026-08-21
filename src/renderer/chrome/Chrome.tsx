@@ -7,6 +7,9 @@ export function Chrome(): JSX.Element {
   const [draft, setDraft] = useState('')
   const [tabs, setTabs] = useState<TabsState>({ tabs: [], activeId: '' })
   const [marks, setMarks] = useState<BookmarksState>({ items: [], barVisible: false, currentSaved: false })
+  // Histórico de las últimas 5 búsquedas/URLs (sesión; el chrome no se recarga).
+  const [history, setHistory] = useState<string[]>([])
+  const [showHist, setShowHist] = useState(false)
 
   useEffect(() => window.overrun.onNavState((s) => {
     setNav(s)
@@ -15,13 +18,28 @@ export function Chrome(): JSX.Element {
   useEffect(() => window.overrun.onTabsState(setTabs), [])
   useEffect(() => window.overrun.onBookmarksState(setMarks), [])
 
-  const go = (): void => window.overrun.navigate(draft)
+  const navigateTo = (raw: string): void => {
+    const url = raw.trim()
+    if (!url) return
+    window.overrun.navigate(url)
+    setHistory((h) => [url, ...h.filter((u) => u !== url)].slice(0, 5))
+    setShowHist(false)
+  }
+  const go = (): void => navigateTo(draft)
+
+  const suggestions = history.filter((u) => draft.trim() === '' || u.toLowerCase().includes(draft.toLowerCase()))
+
+  // El dropdown se recorta por los bounds del chromeView; cuando está visible se
+  // expande la vista del chrome a toda la ventana (transparente) para que flote.
+  useEffect(() => {
+    window.overrun.chromeExpand(showHist && suggestions.length > 0)
+  }, [showHist, suggestions.length])
 
   return (
-    <div style={{ height: '100%', background: 'var(--void)', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* tab strip — zona de arrastre de la ventana (frameless); el padding
           derecho reserva el hueco de los controles nativos (overlay). */}
-      <div style={{ height: 40, display: 'flex', alignItems: 'center', gap: 10, padding: '0 140px 0 14px', borderBottom: '1px solid var(--line-soft)', WebkitAppRegion: 'drag' }}>
+      <div style={{ height: 40, display: 'flex', alignItems: 'center', gap: 10, padding: '0 140px 0 14px', background: 'var(--void)', WebkitAppRegion: 'drag' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 9, WebkitAppRegion: 'no-drag' }}>
           <div style={{ width: 22, height: 22, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#101318', border: '1px solid #2a3038', boxShadow: '0 0 14px -4px oklch(0.82 0.15 195 / 0.5)' }}>
             <svg width="13" height="13" viewBox="0 0 14 14"><path d="M4.2 3.1 L11 7 L4.2 10.9 Z" fill="var(--cyan)" /></svg>
@@ -30,14 +48,14 @@ export function Chrome(): JSX.Element {
         </div>
 
         {/* pestañas abiertas */}
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, flex: 1, minWidth: 0, height: '100%', overflowX: 'auto', WebkitAppRegion: 'no-drag' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, flex: '0 1 auto', minWidth: 0, height: '100%', overflowX: 'auto', WebkitAppRegion: 'no-drag' }}>
           {tabs.tabs.map((t) => {
             const active = t.id === tabs.activeId
             return (
               <div key={t.id}
                 onClick={() => window.overrun.tabActivate(t.id)}
                 title={t.url || t.title}
-                style={{ display: 'flex', alignItems: 'center', gap: 7, height: 30, padding: '0 8px 0 11px', borderRadius: '8px 8px 0 0', cursor: 'pointer', maxWidth: 200, minWidth: 96, background: active ? 'var(--surface-2)' : 'transparent', border: '1px solid', borderColor: active ? 'var(--line-soft)' : 'transparent', borderBottom: 'none' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 7, height: '100%', padding: '0 8px 0 11px', borderRadius: '8px 8px 0 0', cursor: 'pointer', maxWidth: 200, minWidth: 96, background: active ? 'var(--surface-2)' : 'transparent', border: '1px solid', borderColor: active ? 'var(--line-soft)' : 'transparent', borderBottom: 'none' }}>
                 <span style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: t.loading ? 'var(--cyan)' : '#2563eb' }} />
                 <span style={{ fontSize: 12, color: active ? '#e6e9ee' : '#9aa1ab', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {t.title || 'nueva pestaña'}
@@ -51,17 +69,19 @@ export function Chrome(): JSX.Element {
               </div>
             )
           })}
-          <button
-            onClick={() => window.overrun.tabNew()}
-            title="Nueva pestaña"
-            style={{ width: 26, height: 26, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7, border: '1px solid var(--line-soft)', background: 'transparent', color: 'var(--dim)', cursor: 'pointer', fontSize: 16, lineHeight: 1 }}>
-            +
-          </button>
         </div>
+
+        {/* nueva pestaña — fuera del scroll de tabs, siempre visible junto a la última */}
+        <button
+          onClick={() => window.overrun.tabNew()}
+          title="Nueva pestaña"
+          style={{ width: 26, height: 26, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7, border: '1px solid var(--line-soft)', background: 'transparent', color: 'var(--dim)', cursor: 'pointer', fontSize: 16, lineHeight: 1, WebkitAppRegion: 'no-drag' }}>
+          +
+        </button>
       </div>
 
       {/* toolbar */}
-      <div style={{ height: 52, display: 'flex', alignItems: 'center', gap: 12, padding: '0 14px', borderBottom: '1px solid var(--line-soft)', background: '#0c0e12' }}>
+      <div style={{ height: 52, display: 'flex', alignItems: 'center', gap: 12, padding: '0 14px', borderBottom: '1px solid var(--line-soft)', background: 'var(--surface-2)' }}>
         <div style={{ display: 'flex', gap: 2 }}>
           <NavBtn onClick={() => window.overrun.navAction('back')} disabled={!nav.canGoBack} d="M10 3 L5 8 L10 13" />
           <NavBtn onClick={() => window.overrun.navAction('forward')} disabled={!nav.canGoForward} d="M6 3 L11 8 L6 13" />
@@ -69,14 +89,27 @@ export function Chrome(): JSX.Element {
           <StarBtn saved={marks.currentSaved} onClick={() => window.overrun.bookmarkToggle()} />
           <BarToggle active={marks.barVisible} onClick={() => window.overrun.bookmarksBarToggle()} />
         </div>
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && go()}
-          spellCheck={false}
-          placeholder="Ingresá una URL"
-          style={{ flex: 1, height: 34, padding: '0 14px', borderRadius: 9, background: 'var(--surface)', border: '1px solid var(--line)', color: '#cfd3d9', fontFamily: 'var(--font-mono)', fontSize: 12.5, outline: 'none', userSelect: 'text' }}
-        />
+        {/* barra de direcciones + dropdown de historial (custom, en paleta) */}
+        <div style={{ position: 'relative', flex: 1 }}>
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && go()}
+            onFocus={() => setShowHist(true)}
+            onBlur={() => setShowHist(false)}
+            spellCheck={false}
+            placeholder="Ingresá una URL"
+            style={{ width: '100%', height: 34, padding: '0 14px', borderRadius: 9, background: 'var(--surface)', border: '1px solid var(--line)', color: '#cfd3d9', fontFamily: 'var(--font-mono)', fontSize: 12.5, outline: 'none', userSelect: 'text' }}
+          />
+          {showHist && suggestions.length > 0 && (
+            <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 30, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 9, overflow: 'hidden', boxShadow: '0 18px 44px -14px rgba(0,0,0,0.7)' }}>
+              <div style={{ padding: '7px 12px 3px', fontSize: 9, letterSpacing: '0.12em', color: 'var(--mute)', fontFamily: 'var(--font-mono)' }}>RECIENTES</div>
+              {suggestions.map((u) => (
+                <HistRow key={u} url={u} onPick={() => navigateTo(u)} />
+              ))}
+            </div>
+          )}
+        </div>
         {/* resolución actual del viewport de la página */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 34, padding: '0 12px', borderRadius: 9, background: 'var(--surface)', border: '1px solid var(--line)' }}>
           <svg width="14" height="14" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="8" rx="1" stroke="var(--dim)" strokeWidth="1.3" fill="none" /><path d="M6 13 H10" stroke="var(--dim)" strokeWidth="1.3" strokeLinecap="round" /></svg>
@@ -146,6 +179,24 @@ function BarToggle({ active, onClick }: { active: boolean; onClick: () => void }
       style={{ width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7, background: active ? 'var(--surface-2)' : 'transparent', border: 'none', color: active ? 'var(--cyan-bright)' : 'var(--dim)', cursor: 'pointer' }}>
       <svg width="16" height="16" viewBox="0 0 16 16"><path d="M4 2.5 h8 v11 l-4 -2.6 l-4 2.6 Z" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinejoin="round" /></svg>
     </button>
+  )
+}
+
+// Fila del historial: hover en paleta; onMouseDown navega antes del blur del input.
+function HistRow({ url, onPick }: { url: string; onPick: () => void }): JSX.Element {
+  const [hover, setHover] = useState(false)
+  return (
+    <div
+      onMouseDown={(e) => { e.preventDefault(); onPick() }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 12px', cursor: 'pointer', background: hover ? 'oklch(0.82 0.15 195 / 0.1)' : 'transparent' }}>
+      <svg width="12" height="12" viewBox="0 0 16 16" style={{ flexShrink: 0, color: hover ? 'var(--cyan-bright)' : 'var(--mute)' }}>
+        <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.3" fill="none" />
+        <path d="M8 5 V8 L10 9.5" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: hover ? '#e6e9ee' : '#cfd3d9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{url}</span>
+    </div>
   )
 }
 

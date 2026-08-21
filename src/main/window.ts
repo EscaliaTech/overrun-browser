@@ -69,6 +69,9 @@ let tabs: Tab[] = []
 let activeId = ''
 let tabSeq = 0
 let overlayCollapsed = false
+// Chrome expandido: cubre toda la ventana (transparente) para que un popup del
+// chrome (dropdown de historial) se dibuje sobre la página sin recortarse.
+let chromeExpanded = false
 // Posición del overlay: null = anclado a la esquina (default, responsive);
 // una vez arrastrado, queda fijo en {x,y} (top-left).
 let overlayPos: { x: number; y: number } | null = null
@@ -103,7 +106,7 @@ function cornerPos(width: number, height: number, o: { w: number; h: number }): 
 function layout(): void {
   const { width, height } = win.getContentBounds()
   const ch = chromeHeight()
-  chromeView.setBounds({ x: 0, y: 0, width, height: ch })
+  chromeView.setBounds({ x: 0, y: 0, width, height: chromeExpanded ? height : ch })
   const at = activeTab()
   if (at) at.view.setBounds({ x: 0, y: ch, width, height: height - ch })
 
@@ -268,6 +271,7 @@ export function createWindow(): void {
   chromeView = new WebContentsView({ webPreferences: uiPrefs })
   overlayView = new WebContentsView({ webPreferences: uiPrefs })
   overlayView.setBackgroundColor('#00000000') // transparente donde el panel no pinta
+  chromeView.setBackgroundColor('#00000000') // transparente bajo el chrome (popups sobre la página)
 
   win.contentView.addChildView(chromeView)
   win.contentView.addChildView(overlayView)
@@ -301,6 +305,12 @@ export function createWindow(): void {
 }
 
 function registerIpc(): void {
+  // Expande/contrae el chrome para popups que deben flotar sobre la página.
+  ipcMain.on(IPC.chromeExpand, (_e, open: boolean) => {
+    chromeExpanded = open
+    layout()
+  })
+
   ipcMain.on(IPC.navigate, (_e, url: string) => {
     activeTab()?.view.webContents.loadURL(normUrl(url)).catch((err) => console.error('[nav]', err))
   })
