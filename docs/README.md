@@ -13,6 +13,8 @@ Negocio, alcance y comportamiento del sistema.
 | [`producto/PRODUCTO.md`](producto/PRODUCTO.md) | **Documento maestro.** Tesis, alcance, principios de diseño. Empezar aquí. |
 | [`producto/REQUERIMIENTOS.md`](producto/REQUERIMIENTOS.md) | Requisitos formales (`REQ-NNN`) con prioridad, estado y decisión asociada. |
 | [`producto/ROADMAP.md`](producto/ROADMAP.md) | Roadmap por fases (MVP → v1 → v2 → v3): qué se aborda, REQ incluidos y dudas a cerrar. |
+| [`producto/MULTI-SIZE.md`](producto/MULTI-SIZE.md) | Selector de tamaños: catálogo de 55 perfiles, medidas propias, favoritos, emulación y pruebas. |
+| [`producto/V2-V3-ESPECIFICACION.md`](producto/V2-V3-ESPECIFICACION.md) | Diseño detallado, gates y criterios de aceptación para seguridad, IA y MCP. |
 
 ## 🛠️ Ingeniería — cómo está hecho
 Arquitectura técnica y evaluación de la base.

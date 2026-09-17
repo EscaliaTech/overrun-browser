@@ -41,6 +41,14 @@ el análisis de seguridad.
 - **Detalle de request** — General, **timing waterfall** (DNS/Connect/TLS/TTFB), headers de
   request y response, payload y body de respuesta (on-demand).
 - **Chrome propio** — barra de direcciones, navegación y **resolución del viewport** en vivo.
+- **Multi size** — 55 perfiles de móviles, plegables, tablets, portátiles, monitores,
+  TV y breakpoints; búsqueda, favoritos y tamaños personalizados guardados con DPR,
+  touch y rotación. Escalado automático sin recortar el viewport lógico.
+  [Catálogo y guía](docs/producto/MULTI-SIZE.md).
+- **Sesiones exportables** — Network en HAR y todos los paneles en JSON, bajo demanda
+  y sin persistir métricas en disco.
+- **Release interno** — About, User-Agent `Overrun/x.y`, protocolo `overrun://` y
+  automatización de releases Windows/Linux al publicar tags `v*`.
 - Sin barra de menú nativa; identidad visual propia (Space Grotesk + JetBrains Mono).
 
 > **Concepto visual navegable:** [artboards de Overrun](https://claude.ai/code/artifact/90fe30b5-8a82-454e-a03c-1520bb514a24)
@@ -86,6 +94,8 @@ npm run dev          # modo desarrollo con HMR
 |---|---|
 | `npm run dev` | Levanta la app en desarrollo |
 | `npm run typecheck` | Chequeo de tipos (main + renderer) |
+| `bun run test:viewport` | Pruebas de catálogo, validación, rotación y biblioteca |
+| `bun run test:viewport:electron` | Compila y verifica Multi size en Electron con sesión temporal |
 | `npm run build` | Bundle de producción |
 | `npm run package:win` | Instalador NSIS (Windows) |
 | `npm run package:linux` | AppImage (Linux) |

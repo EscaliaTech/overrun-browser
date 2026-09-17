@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
-  DEVICE_PRESETS,
   type NavState,
   type TabsState,
   type BookmarksState,
@@ -8,6 +7,9 @@ import {
   type ViewportState,
   type FindResult
 } from '../../shared/events'
+import { FIT_VIEWPORT } from '../../shared/viewport'
+import { ViewportPicker } from './ViewportPicker'
+import { AboutDialog } from './AboutDialog'
 
 // Barra + tabs de Overrun (chromeView). Frameless propio (BRANDING), no la UI de Chrome.
 export function Chrome(): JSX.Element {
@@ -18,9 +20,10 @@ export function Chrome(): JSX.Element {
   // Historial completo persistido (viene del main); alimenta el autocompletado.
   const [history, setHistory] = useState<HistoryEntry[]>([])
   const [showHist, setShowHist] = useState(false)
-  const [vp, setVp] = useState<ViewportState>({ presetId: null, width: 0, height: 0, dpr: 1, mobile: false, landscape: false, clamped: false })
+  const [vp, setVp] = useState<ViewportState>({ ...FIT_VIEWPORT, scale: 1 })
   const [vpMenu, setVpMenu] = useState(false)
   const [findOpen, setFindOpen] = useState(false)
+  const [aboutOpen, setAboutOpen] = useState(false)
   const addrRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => window.overrun.onNavState((s) => {
@@ -31,6 +34,7 @@ export function Chrome(): JSX.Element {
   useEffect(() => window.overrun.onBookmarksState(setMarks), [])
   useEffect(() => window.overrun.onHistoryState((s) => setHistory(s.items)), [])
   useEffect(() => window.overrun.onViewportState(setVp), [])
+  useEffect(() => window.overrun.onViewportShow(() => setVpMenu(true)), [])
   // Ctrl+L / Alt+D (desde el main): enfoca y selecciona la barra de direcciones.
   useEffect(() => window.overrun.onFocusAddress(() => {
     const el = addrRef.current
@@ -56,8 +60,8 @@ export function Chrome(): JSX.Element {
   // El dropdown se recorta por los bounds del chromeView; cuando está visible se
   // expande la vista del chrome a toda la ventana (transparente) para que flote.
   useEffect(() => {
-    window.overrun.chromeExpand((showHist && suggestions.length > 0) || vpMenu || findOpen)
-  }, [showHist, suggestions.length, vpMenu, findOpen])
+    window.overrun.chromeExpand((showHist && suggestions.length > 0) || vpMenu || findOpen || aboutOpen)
+  }, [showHist, suggestions.length, vpMenu, findOpen, aboutOpen])
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -136,7 +140,9 @@ export function Chrome(): JSX.Element {
           )}
         </div>
         {/* selector de viewport / device mode */}
-        <ViewportChip vp={vp} nav={nav} open={vpMenu} setOpen={setVpMenu} />
+        <ViewportPicker vp={vp} nav={nav} open={vpMenu} setOpen={setVpMenu} />
+        <button onClick={() => setAboutOpen(true)} title="Acerca de Overrun"
+          style={{ width: 34, height: 34, borderRadius: 9, border: '1px solid var(--line)', background: 'var(--surface)', color: 'var(--dim)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: 13 }}>i</button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 34, padding: '0 13px', borderRadius: 9, background: 'oklch(0.82 0.15 195 / 0.14)', border: '1px solid oklch(0.82 0.15 195 / 0.5)', color: 'var(--cyan-bright)', cursor: 'pointer' }}
           onClick={() => window.overrun.overlayControl('toggle')}>
           <svg width="15" height="15" viewBox="0 0 16 16"><path d="M1.5 8 h2.5 l1.5 -4 l2.5 8 l1.5 -4 h5" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -174,6 +180,7 @@ export function Chrome(): JSX.Element {
 
       {/* barra de búsqueda en página (Ctrl+F) — flota sobre la página */}
       {findOpen && <FindBar onClose={() => setFindOpen(false)} />}
+      {aboutOpen && <AboutDialog onClose={() => setAboutOpen(false)} />}
     </div>
   )
 }
@@ -278,95 +285,6 @@ function HistRow({ entry, onPick }: { entry: HistoryEntry; onPick: () => void })
         <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: hover ? '#e6e9ee' : '#cfd3d9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.title}</div>
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--mute)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.url}</div>
       </div>
-    </div>
-  )
-}
-
-// Selector de viewport / device mode. Muestra el device activo + dims; el menú
-// lista "ajustar a ventana", presets, custom W×H y swap de orientación.
-function ViewportChip({ vp, nav, open, setOpen }: { vp: ViewportState; nav: NavState; open: boolean; setOpen: (v: boolean) => void }): JSX.Element {
-  const active = vp.presetId !== null
-  const preset = DEVICE_PRESETS.find((d) => d.id === vp.presetId)
-  const label = vp.presetId === null ? 'Ventana' : vp.presetId === 'custom' ? 'Custom' : preset?.label ?? 'Device'
-  const dims = vp.presetId === null ? `${nav.viewport.width} × ${nav.viewport.height}` : `${vp.width} × ${vp.height}`
-  const [cw, setCw] = useState('')
-  const [chh, setChh] = useState('')
-
-  // Al abrir, precarga los campos custom con las dims actuales.
-  useEffect(() => {
-    if (open) { setCw(String(vp.width || nav.viewport.width)); setChh(String(vp.height || nav.viewport.height)) }
-  }, [open, vp.width, vp.height, nav.viewport.width, nav.viewport.height])
-
-  const set = (presetId: string | null, extra: { width?: number; height?: number; landscape?: boolean } = {}): void => {
-    window.overrun.viewportSet({ presetId, ...extra })
-    setOpen(false)
-  }
-  const applyCustom = (): void => {
-    const w = Number(cw), h = Number(chh)
-    if (w > 0 && h > 0) set('custom', { width: w, height: h, landscape: vp.landscape })
-  }
-
-  return (
-    <div style={{ position: 'relative' }}>
-      <div onClick={() => setOpen(!open)} title="Viewport / device mode"
-        style={{ display: 'flex', alignItems: 'center', gap: 8, height: 34, padding: '0 12px', borderRadius: 9, cursor: 'pointer', background: active ? 'oklch(0.82 0.15 195 / 0.14)' : 'var(--surface)', border: `1px solid ${active ? 'oklch(0.82 0.15 195 / 0.5)' : 'var(--line)'}`, color: active ? 'var(--cyan-bright)' : '#cfd3d9' }}>
-        <svg width="14" height="14" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="8" rx="1" stroke="currentColor" strokeWidth="1.3" fill="none" /><path d="M6 13 H10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{label}</span>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: active ? 'var(--cyan-bright)' : 'var(--dim)' }}>{dims}</span>
-      </div>
-
-      {open && (
-        <>
-          {/* backdrop: cierra al hacer clic fuera (el chrome está expandido sobre la página) */}
-          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 25 }} />
-          <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 30, width: 250, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, overflow: 'hidden', boxShadow: '0 18px 44px -14px rgba(0,0,0,0.7)', fontFamily: 'var(--font-mono)' }}>
-            <VpRow label="Ajustar a ventana" sel={vp.presetId === null} hint="responsive" onClick={() => set(null)} />
-            <div style={{ height: 1, background: 'var(--line-soft)' }} />
-            {DEVICE_PRESETS.map((d) => (
-              <VpRow key={d.id} label={d.label} sel={vp.presetId === d.id}
-                hint={`${d.w}×${d.h}${d.mobile ? ' · touch' : ''}`}
-                onClick={() => set(d.id, { landscape: vp.landscape })} />
-            ))}
-            <div style={{ height: 1, background: 'var(--line-soft)' }} />
-            {/* custom W×H */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px' }}>
-              <input value={cw} onChange={(e) => setCw(e.target.value.replace(/\D/g, ''))} onKeyDown={(e) => e.key === 'Enter' && applyCustom()}
-                placeholder="W" style={inp} />
-              <span style={{ color: 'var(--mute)', fontSize: 11 }}>×</span>
-              <input value={chh} onChange={(e) => setChh(e.target.value.replace(/\D/g, ''))} onKeyDown={(e) => e.key === 'Enter' && applyCustom()}
-                placeholder="H" style={inp} />
-              <button onClick={applyCustom} style={{ height: 26, padding: '0 10px', borderRadius: 6, border: '1px solid oklch(0.82 0.15 195 / 0.5)', background: 'oklch(0.82 0.15 195 / 0.14)', color: 'var(--cyan-bright)', cursor: 'pointer', fontSize: 11 }}>Set</button>
-            </div>
-            {/* orientación */}
-            <div onClick={() => active && set(vp.presetId, { width: vp.width, height: vp.height, landscape: !vp.landscape })}
-              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderTop: '1px solid var(--line-soft)', cursor: active ? 'pointer' : 'default', opacity: active ? 1 : 0.4 }}>
-              <svg width="14" height="14" viewBox="0 0 16 16" style={{ color: 'var(--dim)' }}><path d="M2 6 A6 6 0 0 1 13 5 M13 2 v3 h-3" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              <span style={{ fontSize: 11.5, color: '#cfd3d9' }}>{vp.landscape ? 'Landscape' : 'Portrait'}</span>
-              <span style={{ flex: 1 }} />
-              <span style={{ fontSize: 10, color: 'var(--mute)' }}>rotar</span>
-            </div>
-            {vp.clamped && (
-              <div style={{ padding: '8px 12px', fontSize: 10, color: '#e0a458', background: 'oklch(0.72 0.13 60 / 0.1)', borderTop: '1px solid var(--line-soft)' }}>
-                Recortado: agrandá la ventana para ver el ancho completo.
-              </div>
-            )}
-          </div>
-        </>
-      )}
-    </div>
-  )
-}
-
-const inp: CSSProperties = { width: 62, height: 26, padding: '0 8px', borderRadius: 6, background: 'var(--surface-2)', border: '1px solid var(--line)', color: '#cfd3d9', fontFamily: 'var(--font-mono)', fontSize: 11, outline: 'none', textAlign: 'center' }
-
-function VpRow({ label, hint, sel, onClick }: { label: string; hint: string; sel: boolean; onClick: () => void }): JSX.Element {
-  const [hover, setHover] = useState(false)
-  return (
-    <div onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', cursor: 'pointer', background: hover ? 'oklch(0.82 0.15 195 / 0.1)' : 'transparent' }}>
-      <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: sel ? 'var(--cyan)' : 'transparent', border: sel ? 'none' : '1px solid var(--line)' }} />
-      <span style={{ fontSize: 12, color: sel ? 'var(--cyan-bright)' : '#cfd3d9', flex: 1 }}>{label}</span>
-      <span style={{ fontSize: 10, color: 'var(--mute)' }}>{hint}</span>
     </div>
   )
 }

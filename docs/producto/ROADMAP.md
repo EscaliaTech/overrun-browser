@@ -58,16 +58,27 @@ distribución en Windows + Linux.
   - CPU/Rendimiento (REQ-023) — señales atribuibles a la página (JS, long tasks, render/frame,
     carga); CPU% de proceso opcional y etiquetado aparte.
   - Storage (REQ-024) — cookies, local/session, IndexedDB, cache.
-- **Viewports/dispositivos** (REQ-003) vía CDP `Emulation`.
+- **Viewports/dispositivos** (REQ-003) vía CDP `Emulation`. **Implementado (2026-09-17):**
+  Multi size con 55 perfiles en 7 categorías, búsqueda, favoritos, hasta 50 tamaños
+  personalizados guardados, DPR/touch, rotación y escala automática sin recortar las
+  dimensiones lógicas. Validación compartida e IPC, pruebas unitarias y smoke test
+  en Electron. Catálogo y alcance en [`MULTI-SIZE.md`](MULTI-SIZE.md).
 - Overlay: **click-through** opcional (REQ-013), pestañas de paneles completas; multi-pestaña del
-  navegador.
+  navegador. **Pendiente:** `BaseWindow` no puede reenviar clics únicamente a través de
+  `overlayView`; se necesita separar el overlay transparente en otra ventana para no ignorar toda
+  la app.
 - **Branding** (REQ-050–053): nombre definitivo, icono, chrome frameless pulido, instalador,
-  panel "About", User-Agent, opción de navegador default.
+  panel "About", User-Agent, opción de navegador default. **Implementado para distribución
+  interna:** About, token UA `Overrun/x.y`, protocolo `overrun://` y registro opcional
+  HTTP/HTTPS. El rename público sigue condicionado por P-012.
 - **Optimización nivel 1** (REQ-064): switches (`--disable-features`), procesos acotados, overlay
-  lazy, trim de packaging.
+  lazy, trim de packaging. **Implementado:** switches de red/componentes, fonts latinas
+  solamente y empaquetado limitado a `out/`.
 - **Persistencia** (REQ-080): definir si se guardan sesiones de métricas / historial o todo en
-  memoria.
-- **Distribución** (REQ-073): dominio, canal de descarga, naming del instalador.
+  memoria. **Implementado:** memoria + export manual HAR/JSON; viewport y sesión de navegación
+  se restauran separadamente.
+- **Distribución** (REQ-073): GitHub Releases. **Implementado:** workflow por tag `v*` para
+  NSIS Windows y AppImage Linux.
 
 **Dudas a cerrar:** todas cerradas.
 - ✅ **D-017** click-through (toggle manual) · **D-018** persistencia (memoria + export HAR/JSON) ·
@@ -77,7 +88,9 @@ distribución en Windows + Linux.
   `Overrun` no bloquea nada (D-023).
 
 **Hecho cuando:** un dev lo usa como navegador diario con los 5 paneles, viewports y marca propia,
-instalable en Windows + Linux.
+instalable en Windows + Linux. **Listo para validación de release interna**, salvo REQ-013
+(click-through visible) y la ejecución del workflow de empaquetado en sus runners objetivo. El
+nombre sigue siendo un gate antes de difusión pública.
 
 ---
 
@@ -101,7 +114,12 @@ instalable en Windows + Linux.
 salto de base se **evalúan según necesidad**, no de entrada.
 
 **Hecho cuando:** interceptás y modificás el tráfico de una app y el panel Security muestra
-hallazgos.
+hallazgos. **Estado:** fases 2.0 y 2.1 implementadas (panel Security, permiso explícito, cola con
+timeout, acciones continue/modify/fulfill/block, reglas por host/path/método y auditoría
+exportable); falta la verificación manual de los criterios y las fases 2.2–2.4.
+
+Diseño de fases, threat model operativo y criterios de aceptación:
+[`V2-V3-ESPECIFICACION.md`](V2-V3-ESPECIFICACION.md).
 
 ---
 

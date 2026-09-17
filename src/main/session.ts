@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import type { ViewportSet } from '../shared/viewport'
 
 // ============================================================================
 // Sesión de ventana — persiste las pestañas abiertas (URLs + cuál activa) en
@@ -10,6 +11,7 @@ import { join } from 'node:path'
 export interface SessionData {
   tabs: string[]
   activeIndex: number
+  viewport?: ViewportSet
 }
 
 const file = (): string => join(app.getPath('userData'), 'session.json')
@@ -19,7 +21,8 @@ export function loadSession(): SessionData {
     const p = JSON.parse(readFileSync(file(), 'utf8')) as Partial<SessionData>
     const tabs = Array.isArray(p.tabs) ? p.tabs.filter((u) => typeof u === 'string') : []
     const activeIndex = typeof p.activeIndex === 'number' && p.activeIndex >= 0 && p.activeIndex < tabs.length ? p.activeIndex : 0
-    return { tabs, activeIndex }
+    const viewport = p.viewport && typeof p.viewport === 'object' ? p.viewport as ViewportSet : undefined
+    return { tabs, activeIndex, viewport }
   } catch {
     return { tabs: [], activeIndex: 0 }
   }

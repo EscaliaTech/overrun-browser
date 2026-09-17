@@ -4,6 +4,7 @@ import { handleCdpConsole } from '../events/console'
 import { createMemoryPoller } from '../events/memory'
 import { createPerformancePoller } from '../events/performance'
 import { createStoragePoller } from '../events/storage'
+import { SecurityInterceptor } from '../events/security'
 
 // ============================================================================
 // Capa CDP (D-002) — DESACOPLADA de la base (REQ-062): si mañana se migra a
@@ -15,21 +16,28 @@ import { createStoragePoller } from '../events/storage'
 
 const PROTOCOL_VERSION = '1.3'
 
+export interface CdpAttachment {
+  dispose: () => void
+  security: SecurityInterceptor | null
+}
+
 // Adjunta CDP a una página y devuelve un `dispose` que revierte todo (detach del
 // debugger, pollers y listeners). Solo la pestaña ACTIVA está adjunta a la vez: el
 // normalizador de red es un stream único, así que dos tabs adjuntas se pisarían.
-export function attachCdp(page: WebContents): () => void {
+export function attachCdp(page: WebContents): CdpAttachment {
   const dbg = page.debugger
   try {
     if (!dbg.isAttached()) dbg.attach(PROTOCOL_VERSION)
   } catch (err) {
     console.error('[cdp] no se pudo adjuntar el debugger:', err)
-    return () => {}
+    return { dispose: () => {}, security: null }
   }
+  const security = new SecurityInterceptor(dbg)
 
   // Rutea cada mensaje CDP al normalizador de su dominio.
   const onMessage = (_event: unknown, method: string, params: unknown): void => {
     if (method.startsWith('Network.')) handleCdpNetwork(method, params)
+    else if (method === 'Fetch.requestPaused') security.handleMessage(method, params)
     else if (method === 'Runtime.consoleAPICalled' || method === 'Runtime.exceptionThrown' || method === 'Log.entryAdded') {
       handleCdpConsole(method, params)
     }
@@ -67,7 +75,7 @@ export function attachCdp(page: WebContents): () => void {
   }
   page.on('did-start-navigation', onNavigation)
 
-  return () => {
+  return { security, dispose: () => {
     memory.stop()
     performance.stop()
     storage.stop()
@@ -79,6 +87,7 @@ export function attachCdp(page: WebContents): () => void {
     } catch {
       // El webContents pudo destruirse antes; detach ya no aplica.
     }
+    void security.dispose()
     resetNetwork()
-  }
+  } }
 }

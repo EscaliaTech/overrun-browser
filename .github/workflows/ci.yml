@@ -18,11 +18,19 @@ jobs:
           node-version: 20
           cache: npm
 
+      - uses: oven-sh/setup-bun@v2
+
       - name: Install
         run: npm ci
 
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Unit tests
+        run: bun run test:viewport && bun run test:security
+
       - name: Build
         run: npm run build
+
+      - name: Electron smoke test
+        run: xvfb-run --auto-servernum bun run test:viewport:electron

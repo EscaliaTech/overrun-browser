@@ -12,8 +12,16 @@ import {
   type StorageDetail,
   type ViewportState,
   type ViewportSet,
+  type ViewportApplyResult,
+  type SessionExport,
+  type ExportResult,
+  type AppInfo,
   type FindQuery,
-  type FindResult
+  type FindResult,
+  type SecurityAction,
+  type SecurityActionResult,
+  type SecurityRule,
+  type SecurityState
 } from '../shared/events'
 
 // ============================================================================
@@ -88,13 +96,22 @@ const api = {
   },
 
   // ---- chrome: viewports / device modes ----
-  viewportSet(payload: ViewportSet): void {
-    ipcRenderer.send(IPC.viewportSet, payload)
+  viewportSet(payload: ViewportSet): Promise<ViewportApplyResult> {
+    return ipcRenderer.invoke(IPC.viewportSet, payload)
   },
   onViewportState(fn: (state: ViewportState) => void): () => void {
     const listener = (_e: unknown, state: ViewportState): void => fn(state)
     ipcRenderer.on(IPC.viewportState, listener)
     return () => ipcRenderer.off(IPC.viewportState, listener)
+  },
+  exportSession(payload: SessionExport): Promise<ExportResult> {
+    return ipcRenderer.invoke(IPC.exportSession, payload)
+  },
+  getAppInfo(): Promise<AppInfo> {
+    return ipcRenderer.invoke(IPC.appInfo)
+  },
+  setDefaultBrowser(enabled: boolean): Promise<AppInfo> {
+    return ipcRenderer.invoke(IPC.defaultBrowserSet, enabled)
   },
 
   // ---- chrome: atajos (main → chrome: enfocar barra de direcciones) ----
@@ -102,6 +119,11 @@ const api = {
     const listener = (): void => fn()
     ipcRenderer.on(IPC.focusAddress, listener)
     return () => ipcRenderer.off(IPC.focusAddress, listener)
+  },
+  onViewportShow(fn: () => void): () => void {
+    const listener = (): void => fn()
+    ipcRenderer.on(IPC.viewportShow, listener)
+    return () => ipcRenderer.off(IPC.viewportShow, listener)
   },
 
   // ---- chrome: find in page (Ctrl+F) ----
@@ -120,6 +142,22 @@ const api = {
     const listener = (_e: unknown, r: FindResult): void => fn(r)
     ipcRenderer.on(IPC.findResult, listener)
     return () => ipcRenderer.off(IPC.findResult, listener)
+  },
+
+  // ---- overlay: security / interceptación (v2 — REQ-040) ----
+  securitySetEnabled(enabled: boolean): Promise<SecurityActionResult> {
+    return ipcRenderer.invoke(IPC.securitySetEnabled, enabled)
+  },
+  securityAction(action: SecurityAction): Promise<SecurityActionResult> {
+    return ipcRenderer.invoke(IPC.securityAction, action)
+  },
+  securitySetRules(rules: SecurityRule[]): Promise<SecurityActionResult> {
+    return ipcRenderer.invoke(IPC.securityRules, rules)
+  },
+  onSecurityState(fn: (state: SecurityState) => void): () => void {
+    const listener = (_e: unknown, state: SecurityState): void => fn(state)
+    ipcRenderer.on(IPC.securityState, listener)
+    return () => ipcRenderer.off(IPC.securityState, listener)
   },
 
   // ---- overlay: control de estado (colapsar / expandir) (D-017) ----
