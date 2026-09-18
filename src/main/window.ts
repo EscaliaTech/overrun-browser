@@ -1,11 +1,11 @@
 import { join } from 'node:path'
-import { BaseWindow, WebContentsView, ipcMain, type WebContents } from 'electron'
+import { writeFile } from 'node:fs/promises'
+import { app, BaseWindow, dialog, WebContentsView, ipcMain, type WebContents } from 'electron'
 import { is } from '@electron-toolkit/utils'
-import { attachCdp } from './cdp/attach'
+import { attachCdp, type CdpAttachment } from './cdp/attach'
 import { bus } from './events/bus'
 import {
   IPC,
-  DEVICE_PRESETS,
   type NavAction,
   type NavState,
   type OverlayControl,
@@ -17,8 +17,16 @@ import {
   type StorageKV,
   type ViewportState,
   type ViewportSet,
+  type ViewportApplyResult,
+  type SessionExport,
+  type ExportResult,
+  type AppInfo,
+  type SecurityAction,
+  type SecurityActionResult,
+  type SecurityState,
   type FindQuery
 } from '../shared/events'
+import { parseRules } from '../shared/security'
 import {
   listBookmarks,
   isBarVisible,
@@ -29,14 +37,15 @@ import {
 } from './bookmarks'
 import { addVisit, recentVisits, clearHistory } from './history'
 import { loadSession, saveSession } from './session'
+import { FIT_VIEWPORT, resolveViewport, viewportGeometry, type ViewportConfig } from '../shared/viewport'
 
 // ============================================================================
 // Ventana Overrun — arquitectura de dos superficies apiladas (D-003 / REQ-010,014):
 //
 //   BaseWindow
-//   ├── pageView[activa] (WebContentsView) → la app inspeccionada, SIEMPRE full-size
+//   ├── pageView[activa] (WebContentsView) → página full-size o viewport emulado
 //   ├── chromeView       (WebContentsView) → barra + tabs (React), franja superior
-//   └── overlayView      (WebContentsView) → panel flotante en esquina, SIEMPRE arriba
+//   └── overlayView      (WebContentsView) → panel flotante; chrome modal encima
 //
 // Multi-tab: cada pestaña es su propio WebContentsView (historial/DOM propios). Solo
 // la ACTIVA está montada en el árbol de vistas y adjunta a CDP (el normalizador de
@@ -55,6 +64,7 @@ const OVERLAY_COLLAPSED = { w: 232, h: 44 }
 const OVERLAY_MIN = { w: 340, h: 320 }
 const OVERLAY_MAX = { w: 900, h: 1200 }
 const START_URL = 'https://example.com'
+const overrunUserAgent = (ua: string): string => ua.includes('Overrun/') ? ua : `${ua} Overrun/${app.getVersion()}`
 
 // Alto del chrome: crece cuando la barra de bookmarks está desplegada (retráctil).
 function chromeHeight(): number {
@@ -68,7 +78,7 @@ interface Tab {
   id: string
   view: WebContentsView
   // Teardown de CDP mientras la pestaña es la activa; null cuando está de fondo.
-  disposeCdp: (() => void) | null
+  cdp: CdpAttachment | null
 }
 
 let win: BaseWindow
@@ -85,20 +95,26 @@ let chromeExpanded = false
 // una vez arrastrado, queda fijo en {x,y} (top-left).
 let overlayPos: { x: number; y: number } | null = null
 
-// Viewport / device mode activo. presetId null = página ajustada a la ventana.
-let viewport: { presetId: string | null; w: number; h: number; dpr: number; mobile: boolean; ua?: string; landscape: boolean } = {
-  presetId: null,
-  w: 0,
-  h: 0,
-  dpr: 1,
-  mobile: false,
-  landscape: false
-}
+// Logical dimensions are independent of the native view's display bounds.
+let viewport: ViewportConfig = { ...FIT_VIEWPORT }
+let viewportError: string | undefined
+const emulationQueue = new WeakMap<WebContents, Promise<void>>()
+const emulationRevision = new WeakMap<WebContents, number>()
 
 const clamp = (v: number, lo: number, hi: number): number => Math.min(Math.max(v, lo), Math.max(lo, hi))
 
 function activeTab(): Tab | undefined {
   return tabs.find((t) => t.id === activeId)
+}
+
+function securityState(): SecurityState {
+  return activeTab()?.cdp?.security?.state() ?? {
+    enabled: false, pending: 0, timeoutMs: 15_000, maxPending: 50, rules: [], message: 'CDP no disponible en esta pestaña.'
+  }
+}
+
+function sendSecurityState(): void {
+  overlayView.webContents.send(IPC.securityState, securityState())
 }
 
 function hostOf(url: string): string {
@@ -122,26 +138,14 @@ function cornerPos(width: number, height: number, o: { w: number; h: number }): 
   return { x: width - o.w - MARGIN, y: height - o.h - MARGIN }
 }
 
-// Box de la página según el viewport activo, dentro del área bajo el chrome.
-// Sin preset: llena el área. Con preset: box del device (swap si landscape),
-// centrado horizontalmente y recortado (clamp) si no cabe en la ventana.
-function viewportBox(width: number, availH: number): { x: number; w: number; h: number; clamped: boolean } {
-  if (viewport.presetId === null) return { x: 0, w: width, h: availH, clamped: false }
-  const dw = viewport.landscape ? viewport.h : viewport.w
-  const dh = viewport.landscape ? viewport.w : viewport.h
-  const w = Math.min(dw, width)
-  const h = Math.min(dh, availH)
-  return { x: Math.max(0, Math.floor((width - w) / 2)), w, h, clamped: w < dw || h < dh }
-}
-
 function layout(): void {
   const { width, height } = win.getContentBounds()
   const ch = chromeHeight()
   chromeView.setBounds({ x: 0, y: 0, width, height: chromeExpanded ? height : ch })
   const at = activeTab()
   if (at) {
-    const box = viewportBox(width, height - ch)
-    at.view.setBounds({ x: box.x, y: ch, width: box.w, height: box.h })
+    const box = viewportGeometry(viewport, width, height - ch)
+    at.view.setBounds({ x: box.x, y: ch + box.y, width: box.width, height: box.height })
   }
 
   const o = overlayCollapsed ? OVERLAY_COLLAPSED : overlaySize
@@ -154,6 +158,10 @@ function layout(): void {
   })
 }
 
+function sendOverlayState(): void {
+  overlayView.webContents.send(IPC.overlayState, overlayCollapsed)
+}
+
 function sendNavState(): void {
   const at = activeTab()
   if (!at) return
@@ -164,7 +172,9 @@ function sendNavState(): void {
     canGoBack: wc.navigationHistory.canGoBack(),
     canGoForward: wc.navigationHistory.canGoForward(),
     loading: wc.isLoading(),
-    viewport: { width: b.width, height: b.height }
+    viewport: viewport.presetId === null
+      ? { width: b.width, height: b.height }
+      : { width: viewport.width, height: viewport.height }
   }
   chromeView.webContents.send(IPC.navState, state)
 }
@@ -203,50 +213,91 @@ function sendHistory(): void {
   chromeView.webContents.send(IPC.historyState, state)
 }
 
-// Aplica (o limpia) la emulación de device en la pestaña activa vía CDP. Las dims
-// del override coinciden con el box realmente pintado (viewportBox) para que la
-// superficie y lo que ve la página no se desincronicen. Best-effort: si el
-// debugger no está adjunto o el comando falla, no rompe la navegación.
-async function applyEmulation(wc: WebContents): Promise<void> {
-  const dbg = wc.debugger
-  if (!dbg.isAttached()) return
-  try {
-    if (viewport.presetId === null) {
-      await dbg.sendCommand('Emulation.clearDeviceMetricsOverride')
-      await dbg.sendCommand('Emulation.setTouchEmulationEnabled', { enabled: false })
-      // getUserAgent() devuelve la UA de sesión (no la del override CDP): sirve para restaurar.
-      await dbg.sendCommand('Emulation.setUserAgentOverride', { userAgent: wc.getUserAgent() })
-      return
+// Serialize commands per page: rapid resize/rotate/tab changes cannot leave a
+// mixture of old metrics and new touch/UA settings. Superseded work is skipped.
+function applyEmulation(wc: WebContents): Promise<void> {
+  const revision = (emulationRevision.get(wc) ?? 0) + 1
+  emulationRevision.set(wc, revision)
+  const config = { ...viewport }
+  const { width, height } = win.getContentBounds()
+  const box = viewportGeometry(config, width, height - chromeHeight())
+  const current = (): boolean => !wc.isDestroyed() && activeTab()?.view.webContents === wc &&
+    emulationRevision.get(wc) === revision
+  const task = (emulationQueue.get(wc) ?? Promise.resolve()).then(async () => {
+    if (!current()) return
+    try {
+      const dbg = wc.debugger
+      if (!dbg.isAttached()) throw new Error('CDP no disponible')
+      if (config.presetId === null) {
+        // Electron preserves a prior layout viewport after clearDeviceMetrics.
+        // Keep fit mode synchronized to the native view with an explicit zero-DPR
+        // override, which restores host DPR while producing a reliable resize.
+        await dbg.sendCommand('Emulation.setDeviceMetricsOverride', {
+          width: box.width,
+          height: box.height,
+          screenWidth: box.width,
+          screenHeight: box.height,
+          deviceScaleFactor: 0,
+          mobile: false
+        })
+      } else {
+        await dbg.sendCommand('Emulation.setDeviceMetricsOverride', {
+          width: config.width,
+          height: config.height,
+          screenWidth: config.width,
+          screenHeight: config.height,
+          deviceScaleFactor: config.dpr,
+          mobile: config.mobile,
+          scale: box.scale,
+          screenOrientation: {
+            type: config.width > config.height ? 'landscapePrimary' : 'portraitPrimary',
+            angle: config.width > config.height ? 90 : 0
+          }
+        })
+      }
+      if (!current()) return
+      await dbg.sendCommand('Emulation.setTouchEmulationEnabled', { enabled: config.touch })
+      if (!current()) return
+      await dbg.sendCommand('Emulation.setUserAgentOverride', {
+        userAgent: overrunUserAgent(config.ua || (config.presetId === null ? app.userAgentFallback : wc.getUserAgent()))
+      })
+      if (current()) viewportError = undefined
+    } catch (err) {
+      if (!current()) return
+      viewportError = 'No se pudo aplicar la emulacion. Volve a elegir el tamano.'
+      console.error('[emulation]', err)
     }
-    const { width, height } = win.getContentBounds()
-    const box = viewportBox(width, height - chromeHeight())
-    await dbg.sendCommand('Emulation.setDeviceMetricsOverride', {
-      width: box.w,
-      height: box.h,
-      deviceScaleFactor: viewport.dpr,
-      mobile: viewport.mobile
-    })
-    await dbg.sendCommand('Emulation.setTouchEmulationEnabled', { enabled: viewport.mobile })
-    await dbg.sendCommand('Emulation.setUserAgentOverride', { userAgent: viewport.ua || wc.getUserAgent() })
-  } catch (err) {
-    console.error('[emulation]', err)
-  }
+    if (current()) sendViewport()
+  })
+  emulationQueue.set(wc, task)
+  return task
 }
 
 function sendViewport(): void {
+  const { width, height } = win.getContentBounds()
   const state: ViewportState = {
-    presetId: viewport.presetId,
-    width: viewport.landscape ? viewport.h : viewport.w,
-    height: viewport.landscape ? viewport.w : viewport.h,
-    dpr: viewport.dpr,
-    mobile: viewport.mobile,
-    landscape: viewport.landscape,
-    clamped: (() => {
-      const { width, height } = win.getContentBounds()
-      return viewportBox(width, height - chromeHeight()).clamped
-    })()
+    ...viewport,
+    scale: viewportGeometry(viewport, width, height - chromeHeight()).scale,
+    error: viewportError
   }
   chromeView.webContents.send(IPC.viewportState, state)
+}
+
+function viewportState(): ViewportState {
+  const { width, height } = win.getContentBounds()
+  return {
+    ...viewport,
+    scale: viewportGeometry(viewport, width, height - chromeHeight()).scale,
+    error: viewportError
+  }
+}
+
+function refreshViewportLayout(): void {
+  layout()
+  const wc = activeTab()?.view.webContents
+  if (wc) void applyEmulation(wc)
+  sendViewport()
+  sendNavState()
 }
 
 // Persiste las pestañas abiertas (URLs + activa). No guarda durante el arranque
@@ -256,7 +307,12 @@ function storeSession(): void {
   if (restoring) return
   saveSession({
     tabs: tabs.map((t) => t.view.webContents.getURL()),
-    activeIndex: Math.max(0, tabs.findIndex((t) => t.id === activeId))
+    activeIndex: Math.max(0, tabs.findIndex((t) => t.id === activeId)),
+    viewport: viewport.presetId === null
+      ? { presetId: null }
+      : viewport.presetId === 'custom'
+        ? { presetId: 'custom', width: viewport.width, height: viewport.height, dpr: viewport.dpr, mobile: viewport.mobile, touch: viewport.touch }
+        : { presetId: viewport.presetId, landscape: viewport.landscape }
   })
 }
 
@@ -306,7 +362,7 @@ function createTab(url: string = START_URL, activate = true): void {
   const view = new WebContentsView({
     webPreferences: { sandbox: true, contextIsolation: true } // sin preload: web no confiable
   })
-  const tab: Tab = { id: `tab-${(tabSeq++).toString(36)}`, view, disposeCdp: null }
+  const tab: Tab = { id: `tab-${(tabSeq++).toString(36)}`, view, cdp: null }
   tabs.push(tab)
   wireTabEvents(tab)
   view.webContents.loadURL(normUrl(url)).catch((err) => console.error('[nav]', err))
@@ -322,9 +378,9 @@ function activateTab(id: string): void {
 
   const prev = activeTab()
   if (prev && prev.id !== id) {
-    if (prev.disposeCdp) {
-      prev.disposeCdp()
-      prev.disposeCdp = null
+    if (prev.cdp) {
+      prev.cdp.dispose()
+      prev.cdp = null
     }
     win.contentView.removeChildView(prev.view)
   }
@@ -332,7 +388,7 @@ function activateTab(id: string): void {
   activeId = id
   // Índice 0 = fondo del z-order: la página queda bajo chrome y overlay.
   win.contentView.addChildView(next.view, 0)
-  if (!next.disposeCdp) next.disposeCdp = attachCdp(next.view.webContents)
+  if (!next.cdp) next.cdp = attachCdp(next.view.webContents)
 
   layout()
   void applyEmulation(next.view.webContents) // el device mode sigue a la pestaña activa
@@ -341,6 +397,7 @@ function activateTab(id: string): void {
   sendBookmarks()
   sendHistory()
   sendViewport()
+  sendSecurityState()
   storeSession()
 }
 
@@ -350,9 +407,9 @@ function closeTab(id: string): void {
   const tab = tabs[idx]
   const wasActive = tab.id === activeId
 
-  if (tab.disposeCdp) {
-    tab.disposeCdp()
-    tab.disposeCdp = null
+  if (tab.cdp) {
+    tab.cdp.dispose()
+    tab.cdp = null
   }
   if (wasActive) win.contentView.removeChildView(tab.view)
   tabs.splice(idx, 1)
@@ -384,8 +441,16 @@ export function createWindow(): void {
     // Sin barra de título nativa: el chrome propio llega hasta el borde superior
     // (BRANDING). Los controles nativos min/max/cerrar se dibujan como overlay
     // sobre el tab strip (alto 40); ese strip es la zona de arrastre de la ventana.
-    titleBarStyle: 'hidden',
-    titleBarOverlay: { color: '#0a0b0d', symbolColor: '#cfd3d9', height: TAB_STRIP_H }
+    //
+    // macOS no soporta `titleBarOverlay`: con la barra oculta, los semáforos
+    // flotan sobre el tab strip y tapan las primeras pestañas. Para desarrollo se
+    // deja la barra de título nativa, que no se superpone con nada.
+    // ponytail: si alguna vez se distribuye a Mac, frameless + trafficLightPosition
+    // y padding izquierdo en el tab strip.
+    ...(process.platform === 'darwin' ? {} : {
+      titleBarStyle: 'hidden' as const,
+      titleBarOverlay: { color: '#0a0b0d', symbolColor: '#cfd3d9', height: TAB_STRIP_H }
+    })
   })
 
   const uiPrefs = { preload: join(__dirname, '../preload/index.js'), sandbox: true, contextIsolation: true }
@@ -405,7 +470,7 @@ export function createWindow(): void {
 
   // Sincroniza estado colapsado con el overlay cuando termina de cargar.
   overlayView.webContents.on('did-finish-load', () =>
-    overlayView.webContents.send(IPC.overlayState, overlayCollapsed)
+    sendOverlayState()
   )
   // Reenvía el estado completo al chrome cada vez que carga (incluye HMR/reload en
   // dev) → la tira de tabs no queda vacía tras un reload del renderer.
@@ -415,6 +480,7 @@ export function createWindow(): void {
     sendBookmarks()
     sendHistory()
     sendViewport()
+    sendSecurityState()
   })
 
   // Atajos globales: la barra propia y el overlay también deben responder cuando
@@ -425,13 +491,12 @@ export function createWindow(): void {
   // Bus → overlay (IPC). Único puente main→UI de observabilidad.
   bus.onEvent((evt) => overlayView.webContents.send(IPC.event, evt))
 
-  win.on('resize', () => {
-    layout()
-    sendNavState() // la resolución cambió
-  })
+  win.on('resize', refreshViewportLayout)
 
   // Restaura la sesión: reabre las pestañas que estaban abiertas (o una nueva).
   const s = loadSession()
+  const restoredViewport = s.viewport ? resolveViewport(s.viewport) : null
+  if (restoredViewport) viewport = restoredViewport
   if (s.tabs.length > 0) {
     s.tabs.forEach((u) => createTab(/^https?:/i.test(u) ? u : START_URL, false))
     const target = tabs[s.activeIndex] ?? tabs[0]
@@ -454,6 +519,8 @@ function registerIpc(): void {
   // Expande/contrae el chrome para popups que deben flotar sobre la página.
   ipcMain.on(IPC.chromeExpand, (_e, open: boolean) => {
     chromeExpanded = open
+    // A modal picker must remain above the observability panel, including input.
+    win.contentView.addChildView(open ? chromeView : overlayView)
     layout()
   })
 
@@ -477,7 +544,77 @@ function registerIpc(): void {
   ipcMain.on(IPC.tabActivate, (_e, id: string) => activateTab(id))
 
   // ---- viewports / device modes ----
-  ipcMain.on(IPC.viewportSet, (_e, p: ViewportSet) => setViewport(p))
+  ipcMain.handle(IPC.viewportSet, async (e, p: ViewportSet): Promise<ViewportApplyResult> => {
+    if (e.sender !== chromeView.webContents) {
+      return { ok: false, state: viewportState(), error: 'Origen no autorizado.' }
+    }
+    return setViewport(p)
+  })
+
+  ipcMain.handle(IPC.exportSession, async (e, payload: SessionExport): Promise<ExportResult> => {
+    if ((e.sender !== overlayView.webContents && e.sender !== chromeView.webContents) || !isSessionExport(payload)) {
+      return { canceled: false, error: 'Exportación no autorizada o inválida.' }
+    }
+    const target = await dialog.showSaveDialog(win, {
+      title: 'Exportar sesión',
+      defaultPath: payload.filename,
+      filters: [{ name: payload.format === 'har' ? 'HAR' : 'JSON', extensions: [payload.format] }]
+    })
+    if (target.canceled || !target.filePath) return { canceled: true }
+    try {
+      await writeFile(target.filePath, JSON.stringify(payload.payload, null, 2), 'utf8')
+      return { canceled: false, path: target.filePath }
+    } catch (err) {
+      return { canceled: false, error: (err as Error).message }
+    }
+  })
+
+  ipcMain.handle(IPC.appInfo, (): AppInfo => ({
+    name: app.getName(), version: app.getVersion(),
+    defaultBrowserRegistered: app.isDefaultProtocolClient('http') && app.isDefaultProtocolClient('https')
+  }))
+  ipcMain.handle(IPC.defaultBrowserSet, (_e, enabled: boolean): AppInfo => {
+    if (typeof enabled === 'boolean') {
+      if (enabled) {
+        app.setAsDefaultProtocolClient('http')
+        app.setAsDefaultProtocolClient('https')
+      } else {
+        app.removeAsDefaultProtocolClient('http')
+        app.removeAsDefaultProtocolClient('https')
+      }
+    }
+    return {
+      name: app.getName(), version: app.getVersion(),
+      defaultBrowserRegistered: app.isDefaultProtocolClient('http') && app.isDefaultProtocolClient('https')
+    }
+  })
+
+  ipcMain.handle(IPC.securitySetEnabled, async (e, enabled: boolean): Promise<SecurityActionResult> => {
+    if (e.sender !== overlayView.webContents || typeof enabled !== 'boolean') {
+      return { ok: false, state: securityState(), error: 'Origen no autorizado.' }
+    }
+    const controller = activeTab()?.cdp?.security
+    if (!controller) return { ok: false, state: securityState(), error: 'CDP no está disponible en esta pestaña.' }
+    const result = await controller.setEnabled(enabled)
+    sendSecurityState()
+    return result
+  })
+  ipcMain.handle(IPC.securityRules, async (e, rules: unknown): Promise<SecurityActionResult> => {
+    if (e.sender !== overlayView.webContents) return { ok: false, state: securityState(), error: 'Origen no autorizado.' }
+    const controller = activeTab()?.cdp?.security
+    if (!controller) return { ok: false, state: securityState(), error: 'CDP no está disponible en esta pestaña.' }
+    const result = await controller.setRules(parseRules(rules))
+    sendSecurityState()
+    return result
+  })
+  ipcMain.handle(IPC.securityAction, async (e, action: SecurityAction): Promise<SecurityActionResult> => {
+    if (e.sender !== overlayView.webContents) return { ok: false, state: securityState(), error: 'Origen no autorizado.' }
+    const controller = activeTab()?.cdp?.security
+    if (!controller) return { ok: false, state: securityState(), error: 'CDP no está disponible en esta pestaña.' }
+    const result = await controller.act(action)
+    sendSecurityState()
+    return result
+  })
 
   // ---- find in page (Ctrl+F) ----
   ipcMain.on(IPC.findQuery, (_e, q: FindQuery) => {
@@ -511,7 +648,7 @@ function registerIpc(): void {
   })
   ipcMain.on(IPC.bookmarksBarToggle, () => {
     toggleBar()
-    layout() // el alto del chrome cambió
+    refreshViewportLayout() // el alto del chrome cambió
     sendBookmarks()
   })
 
@@ -519,9 +656,8 @@ function registerIpc(): void {
     if (control === 'collapse') overlayCollapsed = true
     else if (control === 'expand') overlayCollapsed = false
     else if (control === 'toggle') overlayCollapsed = !overlayCollapsed
-    // 'toggle-clickthrough' → v1 (REQ-013 / D-017): pendiente de implementación.
     layout()
-    overlayView.webContents.send(IPC.overlayState, overlayCollapsed)
+    sendOverlayState()
   })
 
   // Body de respuesta on-demand (REQ-020). CDP lo retiene hasta navegar.
@@ -620,36 +756,33 @@ function registerIpc(): void {
 }
 
 // Resuelve un preset/custom/fit → estado de viewport, relayoutea y re-emula.
-function setViewport(p: ViewportSet): void {
-  if (p.presetId === null) {
-    viewport = { presetId: null, w: 0, h: 0, dpr: 1, mobile: false, landscape: false }
-  } else if (p.presetId === 'custom') {
-    viewport = {
-      presetId: 'custom',
-      w: clamp(Math.round(p.width ?? 0), 200, 4000),
-      h: clamp(Math.round(p.height ?? 0), 200, 4000),
-      dpr: 1,
-      mobile: false,
-      landscape: !!p.landscape
-    }
-  } else {
-    const preset = DEVICE_PRESETS.find((d) => d.id === p.presetId)
-    if (!preset) return
-    viewport = {
-      presetId: preset.id,
-      w: preset.w,
-      h: preset.h,
-      dpr: preset.dpr,
-      mobile: preset.mobile,
-      ua: preset.ua,
-      landscape: !!p.landscape
-    }
+async function setViewport(p: ViewportSet): Promise<ViewportApplyResult> {
+  const next = resolveViewport(p)
+  if (!next) {
+    viewportError = 'Tamano invalido: usa enteros de 200 a 7680 px y DPR de 0.5 a 4.'
+    sendViewport()
+    return { ok: false, state: viewportState(), error: viewportError }
   }
+  viewport = next
+  viewportError = undefined
   layout()
   const wc = activeTab()?.view.webContents
-  if (wc) void applyEmulation(wc)
+  if (wc) await applyEmulation(wc)
+  // Dispatch a second native resize after the metrics override settles.
+  layout()
   sendViewport()
   sendNavState() // las dims del viewport cambiaron
+  storeSession()
+  return viewportError
+    ? { ok: false, state: viewportState(), error: viewportError }
+    : { ok: true, state: viewportState() }
+}
+
+function isSessionExport(value: unknown): value is SessionExport {
+  if (!value || typeof value !== 'object') return false
+  const v = value as SessionExport
+  return (v.format === 'har' || v.format === 'json') &&
+    typeof v.filename === 'string' && v.filename.length > 0 && v.filename.length < 200
 }
 
 // ---- atajos de teclado (before-input-event, REQ-026) ----
@@ -681,14 +814,15 @@ function attachShortcuts(wc: WebContents): void {
     else if (mod && key === 'tab') cycleTab(shift ? -1 : 1)
     else if (mod && !shift && /^[1-9]$/.test(key)) activateByIndex(Number(key))
     else if ((mod && key === 'l') || (input.alt && key === 'd')) chromeView.webContents.send(IPC.focusAddress)
+    else if (mod && shift && key === 'm') chromeView.webContents.send(IPC.viewportShow)
     else if (mod && !shift && key === 'd') {
       const w = page()
       if (w) { toggleBookmark(w.getURL(), w.getTitle()); sendBookmarks() }
-    } else if (mod && !shift && key === 'b') { toggleBar(); layout(); sendBookmarks() }
+    } else if (mod && !shift && key === 'b') { toggleBar(); refreshViewportLayout(); sendBookmarks() }
     else if (mod && shift && key === 'o') {
       overlayCollapsed = !overlayCollapsed
       layout()
-      overlayView.webContents.send(IPC.overlayState, overlayCollapsed)
+      sendOverlayState()
     } else if (mod && !shift && key === 'p') {
       const w = page()
       if (w && !w.isDestroyed()) w.print()

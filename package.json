@@ -14,6 +14,10 @@
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "test:viewport": "bun test src/shared/viewport.test.ts",
+    "test:security": "bun test src/shared/security.test.ts",
+    "test:viewport:electron": "electron-vite build && electron src/main/viewport.smoke.cjs",
+    "test:security:electron": "electron-vite build && electron src/main/security.smoke.cjs",
     "package:win": "electron-vite build && electron-builder --win --publish never",
     "package:linux": "electron-vite build && electron-builder --linux --publish never"
   },

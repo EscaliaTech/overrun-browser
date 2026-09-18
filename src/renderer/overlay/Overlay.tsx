@@ -4,15 +4,18 @@ import { ConsolePanel } from './ConsolePanel'
 import { MemoryPanel } from './MemoryPanel'
 import { PerformancePanel } from './PerformancePanel'
 import { StoragePanel } from './StoragePanel'
+import { SecurityPanel } from './SecurityPanel'
 import { useNetwork } from './useNetwork'
 import { useConsole } from './useConsole'
 import { useMemory } from './useMemory'
 import { usePerformance } from './usePerformance'
 import { useStorage } from './useStorage'
+import { useSecurity } from './useSecurity'
+import { exportHar, exportJson } from './exportSession'
 
-type Tab = 'Network' | 'Console' | 'Memory' | 'CPU' | 'Storage'
-const TABS: Tab[] = ['Network', 'Console', 'Memory', 'CPU', 'Storage']
-const ENABLED: Tab[] = ['Network', 'Console', 'Memory', 'CPU', 'Storage'] // v1
+type Tab = 'Network' | 'Console' | 'Memory' | 'CPU' | 'Storage' | 'Security'
+const TABS: Tab[] = ['Network', 'Console', 'Memory', 'CPU', 'Storage', 'Security']
+const ENABLED: Tab[] = ['Network', 'Console', 'Memory', 'CPU', 'Storage', 'Security'] // v1 + v2 (security)
 
 // Gesto de arrastre genérico: captura el puntero y manda deltas de pantalla al
 // callback (mover o redimensionar). `moved` distingue drag de click (para el pill).
@@ -60,6 +63,7 @@ function useDrag(onDelta: (dx: number, dy: number) => void): {
 export function Overlay(): JSX.Element {
   const [collapsed, setCollapsed] = useState(false)
   const [tab, setTab] = useState<Tab>('Network')
+  const [exportStatus, setExportStatus] = useState('')
   const drag = useDrag((dx, dy) => window.overrun.overlayMove(dx, dy))
   const resize = useDrag((dx, dy) => window.overrun.overlayResize(dx, dy))
   // Hooks montados SIEMPRE (aun colapsado) → los dominios se recolectan sin
@@ -69,6 +73,14 @@ export function Overlay(): JSX.Element {
   const mem = useMemory()
   const perf = usePerformance()
   const st = useStorage()
+  const sec = useSecurity()
+  const exportData = async (format: 'har' | 'json'): Promise<void> => {
+    setExportStatus('Exportando…')
+    const status = format === 'har'
+      ? await exportHar(net)
+      : await exportJson({ network: net, console: con, memory: mem, performance: perf, storage: st, security: sec })
+    setExportStatus(status)
+  }
 
   useEffect(() => window.overrun.onOverlayState(setCollapsed), [])
 
@@ -98,7 +110,7 @@ export function Overlay(): JSX.Element {
         {TABS.map((t) => {
           const active = t === tab
           const enabled = ENABLED.includes(t)
-          const badge = t === 'Console' && con.counts.error > 0 ? con.counts.error : 0
+          const badge = t === 'Console' ? con.counts.error : t === 'Security' ? sec.state.pending : 0
           return (
             <div key={t}
               onClick={() => enabled && setTab(t)}
@@ -110,12 +122,15 @@ export function Overlay(): JSX.Element {
         })}
       </div>
 
-      {tab === 'Network' ? <NetworkPanel net={net} /> : tab === 'Console' ? <ConsolePanel con={con} /> : tab === 'Memory' ? <MemoryPanel mem={mem} /> : tab === 'CPU' ? <PerformancePanel perf={perf} /> : tab === 'Storage' ? <StoragePanel st={st} /> : <Placeholder tab={tab} />}
+      {tab === 'Network' ? <NetworkPanel net={net} /> : tab === 'Console' ? <ConsolePanel con={con} /> : tab === 'Memory' ? <MemoryPanel mem={mem} /> : tab === 'CPU' ? <PerformancePanel perf={perf} /> : tab === 'Storage' ? <StoragePanel st={st} /> : tab === 'Security' ? <SecurityPanel sec={sec} /> : <Placeholder tab={tab} />}
 
       {/* footer */}
       <div style={{ height: 34, display: 'flex', alignItems: 'center', gap: 8, padding: '0 14px', borderTop: '1px solid #22262e', fontFamily: 'var(--font-mono)' }}>
         <span style={dot('var(--green)')} />
         <span style={{ fontSize: 10, color: 'var(--dim)' }}>CDP 1.3 · attached</span>
+        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 9, color: 'var(--mute)' }}>{exportStatus}</span>
+        <button onClick={() => void exportData('har')} title="Exportar Network como HAR" style={footerBtn}>HAR</button>
+        <button onClick={() => void exportData('json')} title="Exportar toda la sesión como JSON" style={footerBtn}>JSON</button>
       </div>
     </div>
   )
@@ -158,6 +173,17 @@ const iconBtn: CSSProperties = {
   color: 'var(--mute)',
   cursor: 'pointer',
   display: 'flex'
+}
+
+const footerBtn: CSSProperties = {
+  border: '1px solid var(--line)',
+  borderRadius: 4,
+  background: 'transparent',
+  color: 'var(--dim)',
+  cursor: 'pointer',
+  padding: '3px 5px',
+  fontFamily: 'var(--font-mono)',
+  fontSize: 9
 }
 
 function dot(color: string): CSSProperties {

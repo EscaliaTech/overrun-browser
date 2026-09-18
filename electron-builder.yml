@@ -2,6 +2,16 @@
 # macOS deliberadamente ausente (Gatekeeper exige notarización paga).
 appId: com.overrun.app
 productName: Overrun
+protocols:
+  - name: Overrun
+    schemes:
+      - overrun
+  - name: HTTP
+    schemes:
+      - http
+  - name: HTTPS
+    schemes:
+      - https
 
 directories:
   output: dist

@@ -8,6 +8,8 @@
 // Compartido entre main y renderer para tener una única fuente de verdad del tipo.
 // ============================================================================
 
+import type { ViewportState } from './viewport'
+
 export type Domain =
   | 'network'
   | 'console'
@@ -202,11 +204,75 @@ export interface StorageDetail {
 }
 
 // ---------------------------------------------------------------------------
+// Dominio: security (v2 — REQ-040)
+// ---------------------------------------------------------------------------
+
+export type SecurityPhase = 'intercepted' | 'continued' | 'modified' | 'fulfilled' | 'blocked' | 'timed-out' | 'disabled'
+
+export interface SecurityRecord {
+  id: string
+  phase: SecurityPhase
+  method: string
+  url: string
+  resourceType?: string
+  requestHeaders: Record<string, string>
+  postData?: string
+  reason?: string
+  /** Regla que decidió la acción, si hubo una. */
+  ruleId?: string
+  /** Datos mostrados o exportados: siempre redactados en el proceso main. */
+  redacted: true
+}
+
+export interface SecurityEvent extends OverrunEventBase {
+  domain: 'security'
+  record: SecurityRecord
+}
+
+/** Qué hace una regla con el tráfico que selecciona. Sin regla: pausa manual. */
+export type SecurityRuleMode = 'pause' | 'observe' | 'rewrite' | 'block'
+
+export interface SecurityRule {
+  id: string
+  /** `*`, un host exacto o `*.dominio` (incluye el dominio raíz). */
+  host: string
+  /** Prefijo de path+query; vacío = cualquiera. */
+  path: string
+  /** `*` o un método HTTP. */
+  method: string
+  mode: SecurityRuleMode
+  /** Solo `rewrite`: headers a fijar antes de continuar. */
+  setHeaders?: Record<string, string>
+  /** Solo `rewrite`: destino alternativo. */
+  redirectTo?: string
+}
+
+export interface SecurityState {
+  enabled: boolean
+  pending: number
+  timeoutMs: number
+  maxPending: number
+  rules: SecurityRule[]
+  message?: string
+}
+
+export type SecurityAction =
+  | { kind: 'continue'; id: string }
+  | { kind: 'block'; id: string; reason?: string }
+  | { kind: 'modify'; id: string; url?: string; method?: string; headers?: Record<string, string>; postData?: string }
+  | { kind: 'fulfill'; id: string; status?: number; body?: string; headers?: Record<string, string> }
+
+export interface SecurityActionResult {
+  ok: boolean
+  state: SecurityState
+  error?: string
+}
+
+// ---------------------------------------------------------------------------
 // Unión de todos los eventos del bus. Otros dominios se suman aquí sin rediseño.
 // ---------------------------------------------------------------------------
 
-export type OverrunEvent = NetworkEvent | ConsoleEvent | MemoryEvent | PerformanceEvent | StorageEvent
-// | SecurityEvent (v2)
+export type OverrunEvent = NetworkEvent | ConsoleEvent | MemoryEvent | PerformanceEvent | StorageEvent | SecurityEvent
 
 /** Canales IPC — un único punto para no tipear strings sueltos. */
 export const IPC = {
@@ -218,7 +284,7 @@ export const IPC = {
   navigate: 'overrun:navigate',
   /** chrome → main: back/forward/reload. */
   navAction: 'overrun:nav-action',
-  /** chrome/overlay → main: mostrar/ocultar overlay o alternar click-through (D-017). */
+  /** chrome/overlay → main: mostrar, ocultar o colapsar el overlay. */
   overlayControl: 'overrun:overlay-control',
   /** main → overlay: estado colapsado (fuente de verdad en el main). */
   overlayState: 'overrun:overlay-state',
@@ -267,10 +333,26 @@ export const IPC = {
   viewportState: 'overrun:viewport-state',
   /** chrome → main: fijar viewport (preset / custom / ajustar a ventana). */
   viewportSet: 'overrun:viewport-set',
+  /** overlay → main: guardar una exportación de sesión elegida por el usuario. */
+  exportSession: 'overrun:export-session',
+  /** chrome → main: información y acciones de producto (About / protocolos). */
+  appInfo: 'overrun:app-info',
+  /** chrome → main: registrar o quitar protocolos como navegador predeterminado. */
+  defaultBrowserSet: 'overrun:default-browser-set',
+  /** overlay → main: activar/desactivar Fetch para la pestaña activa. */
+  securitySetEnabled: 'overrun:security-set-enabled',
+  /** overlay → main: continuar, modificar o bloquear una petición pausada. */
+  securityAction: 'overrun:security-action',
+  /** overlay → main: reemplazar las reglas locales por host/path/método. */
+  securityRules: 'overrun:security-rules',
+  /** main → overlay: estado de permiso, reglas y cola de interceptación. */
+  securityState: 'overrun:security-state',
 
   // ---- atajos de teclado ----
   /** main → chrome: enfocar la barra de direcciones (Ctrl+L). */
   focusAddress: 'overrun:focus-address',
+  /** main → chrome: abrir el selector Multi size (Ctrl+Shift+M). */
+  viewportShow: 'overrun:viewport-show',
 
   // ---- find in page (Ctrl+F) ----
   /** main → chrome: mostrar/enfocar la barra de búsqueda (Ctrl+F). */
@@ -331,66 +413,37 @@ export interface Viewport {
 }
 
 // ---------------------------------------------------------------------------
-// Viewports / device modes (v1 — REQ-025 / Emulation)
+// Viewports / device modes (v1 — REQ-003 / Emulation)
 //
 // El usuario testea la página a resoluciones concretas. `null` = ajustado a la
-// ventana (sin override). Un preset (o custom) redimensiona la vista de la página
+// ventana (métricas sincronizadas al tamaño nativo). Un preset (o custom) redimensiona la vista de la página
 // a ese box y aplica CDP Emulation (DPR, touch, UA móvil) a la pestaña activa.
 // ---------------------------------------------------------------------------
 
-const UA_IOS =
-  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
-const UA_IPAD =
-  'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
-const UA_ANDROID =
-  'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'
+export { DEVICE_PRESETS, type DevicePreset, type ViewportState, type ViewportSet } from './viewport'
 
-export interface DevicePreset {
-  id: string
-  label: string
-  /** dims lógicas en portrait (CSS px). */
-  w: number
-  h: number
-  /** device pixel ratio. */
-  dpr: number
-  /** emula touch + flag mobile en media queries. */
-  mobile: boolean
-  /** user-agent a forzar (solo presets móviles). */
-  ua?: string
+export interface ViewportApplyResult {
+  ok: boolean
+  state: ViewportState
+  error?: string
 }
 
-/** Catálogo de dispositivos para el selector. Orden: móvil → tablet → desktop. */
-export const DEVICE_PRESETS: DevicePreset[] = [
-  { id: 'iphone-se', label: 'iPhone SE', w: 375, h: 667, dpr: 2, mobile: true, ua: UA_IOS },
-  { id: 'iphone-14', label: 'iPhone 14 Pro', w: 393, h: 852, dpr: 3, mobile: true, ua: UA_IOS },
-  { id: 'pixel-7', label: 'Pixel 7', w: 412, h: 915, dpr: 2.625, mobile: true, ua: UA_ANDROID },
-  { id: 'ipad-mini', label: 'iPad Mini', w: 768, h: 1024, dpr: 2, mobile: true, ua: UA_IPAD },
-  { id: 'ipad-pro', label: 'iPad Pro 11"', w: 834, h: 1194, dpr: 2, mobile: true, ua: UA_IPAD },
-  { id: 'laptop', label: 'Laptop', w: 1280, h: 800, dpr: 1, mobile: false },
-  { id: 'desktop', label: 'Desktop HD', w: 1920, h: 1080, dpr: 1, mobile: false }
-]
-
-export interface ViewportState {
-  /** id del preset, 'custom', o null = ajustado a la ventana. */
-  presetId: string | null
-  /** dims lógicas activas (0 cuando presetId === null). */
-  width: number
-  height: number
-  dpr: number
-  mobile: boolean
-  /** landscape = swap de w/h respecto al preset. */
-  landscape: boolean
-  /** el box no cabe entero en la ventana y quedó recortado. */
-  clamped: boolean
+export interface SessionExport {
+  filename: string
+  format: 'har' | 'json'
+  payload: unknown
 }
 
-/** chrome → main: fijar viewport. presetId null = ajustar a ventana. */
-export interface ViewportSet {
-  presetId: string | null
-  /** solo para presetId 'custom'. */
-  width?: number
-  height?: number
-  landscape?: boolean
+export interface ExportResult {
+  canceled: boolean
+  path?: string
+  error?: string
+}
+
+export interface AppInfo {
+  name: string
+  version: string
+  defaultBrowserRegistered: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -423,4 +476,4 @@ export interface NavState {
 }
 
 export type NavAction = 'back' | 'forward' | 'reload' | 'stop'
-export type OverlayControl = 'toggle' | 'collapse' | 'expand' | 'toggle-clickthrough'
+export type OverlayControl = 'toggle' | 'collapse' | 'expand'

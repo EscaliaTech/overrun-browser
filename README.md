@@ -41,6 +41,14 @@ el análisis de seguridad.
 - **Detalle de request** — General, **timing waterfall** (DNS/Connect/TLS/TTFB), headers de
   request y response, payload y body de respuesta (on-demand).
 - **Chrome propio** — barra de direcciones, navegación y **resolución del viewport** en vivo.
+- **Multi size** — 55 perfiles de móviles, plegables, tablets, portátiles, monitores,
+  TV y breakpoints; búsqueda, favoritos y tamaños personalizados guardados con DPR,
+  touch y rotación. Escalado automático sin recortar el viewport lógico.
+  [Catálogo y guía](docs/producto/MULTI-SIZE.md).
+- **Sesiones exportables** — Network en HAR y todos los paneles en JSON, bajo demanda
+  y sin persistir métricas en disco.
+- **Release interno** — About, User-Agent `Overrun/x.y`, protocolo `overrun://` y
+  automatización de releases Windows/Linux al publicar tags `v*`.
 - Sin barra de menú nativa; identidad visual propia (Space Grotesk + JetBrains Mono).
 
 > **Concepto visual navegable:** [artboards de Overrun](https://claude.ai/code/artifact/90fe30b5-8a82-454e-a03c-1520bb514a24)
@@ -75,17 +83,28 @@ MCP en v3, sin reimplementar.
 
 ## Desarrollo
 
-Requiere **Node 20+**.
+Requiere **Node 20+** (y `bun` solo para correr las pruebas).
 
 ```bash
 npm install
 npm run dev          # modo desarrollo con HMR
 ```
 
+**Plataformas:** Windows y Linux son las plataformas soportadas (las que se empaquetan
+y las que corre CI). **macOS anda para desarrollo**, con dos diferencias: usa la barra
+de título nativa en vez del chrome frameless (macOS no soporta `titleBarOverlay`, y los
+semáforos taparían las pestañas) y conserva el menú de aplicación mínimo, porque ahí los
+atajos de edición (Cmd+C/V/X/A) dependen de los roles del menú. No hay empaquetado para
+Mac: el instalador exigiría notarización paga (D-010).
+
 | Script | Qué hace |
 |---|---|
 | `npm run dev` | Levanta la app en desarrollo |
 | `npm run typecheck` | Chequeo de tipos (main + renderer) |
+| `bun run test:viewport` | Pruebas de catálogo, validación, rotación y biblioteca |
+| `bun run test:viewport:electron` | Compila y verifica Multi size en Electron con sesión temporal |
+| `bun run test:security` | Pruebas de redacción y reglas de interceptación |
+| `bun run test:security:electron` | Compila y verifica los criterios de la fase 2.1 en Electron |
 | `npm run build` | Bundle de producción |
 | `npm run package:win` | Instalador NSIS (Windows) |
 | `npm run package:linux` | AppImage (Linux) |

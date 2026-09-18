@@ -16,7 +16,7 @@ Requisitos formales (`REQ-NNN`) derivados de las decisiones tomadas. Cada uno en
 |---|---|---|---|---|
 | REQ-001 | Navegar la web como navegador Chromium: barra de direcciones, pestañas, atrás/adelante/recargar | MVP | Definido | D-001 |
 | REQ-002 | La página se renderiza **a tamaño completo**; ninguna herramienta reduce el viewport | MVP | Definido | D-003 |
-| REQ-003 | Selector de viewport / resolución (modos de dispositivo vía CDP `Emulation`) | v1 | Definido | — |
+| REQ-003 | Selector Multi size: catálogo por dispositivo, tamaños personalizados, DPR/touch, rotación, favoritos y escalado sin alterar dimensiones CSS ([alcance](MULTI-SIZE.md)) | v1 | Implementado | CDP `Emulation` |
 
 ## Overlay de observabilidad
 
@@ -25,7 +25,7 @@ Requisitos formales (`REQ-NNN`) derivados de las decisiones tomadas. Cada uno en
 | REQ-010 | Panel de herramientas como **overlay flotante** anclado a esquina, por encima de la página | MVP | Definido | D-003 |
 | REQ-011 | Overlay **colapsable** a pill/burbuja; expandir/colapsar sin redimensionar la página | MVP | Definido | D-003 |
 | REQ-012 | El overlay y la instrumentación operan **fuera del DOM y del contexto JavaScript** de la página, **minimizando** cualquier impacto o modificación observable sobre la app inspeccionada | MVP | Definido | D-002 |
-| REQ-013 | Overlay con **click-through** por toggle manual (default: captura) | v1 | Definido | D-017 |
+| REQ-013 | Overlay con **click-through** por toggle manual (default: captura) | v1 | Pendiente: requiere una ventana overlay transparente separada; `BaseWindow` no permite ignorar solo un `WebContentsView` | D-017 |
 | REQ-014 | El overlay **no forma parte del viewport** de la página: no altera las dimensiones que la página reporta (`innerWidth/Height`, `visualViewport`, `matchMedia`/media queries, `ResizeObserver`, eventos `resize`) | MVP | Definido | D-003 |
 
 ## Paneles de métricas
