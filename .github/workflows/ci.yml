@@ -11,11 +11,11 @@ jobs:
     name: typecheck & build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - uses: oven-sh/setup-bun@v2
@@ -31,6 +31,15 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      # Los runners de ubuntu-latest ya no traen el helper SUID de Chromium con
+      # los permisos que Electron exige; sin esto aborta con "The SUID sandbox
+      # helper binary ... is not configured correctly". Se corrige en vez de
+      # apagar el sandbox: la app corre con sandbox y así lo prueba el smoke.
+      - name: Chromium sandbox permissions
+        run: |
+          sudo chown root:root node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
 
       - name: Electron smoke test
         run: xvfb-run --auto-servernum bun run test:viewport:electron
