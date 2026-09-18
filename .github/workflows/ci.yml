@@ -34,3 +34,6 @@ jobs:
 
       - name: Electron smoke test
         run: xvfb-run --auto-servernum bun run test:viewport:electron
+
+      - name: Electron smoke test (security)
+        run: xvfb-run --auto-servernum bun run test:security:electron

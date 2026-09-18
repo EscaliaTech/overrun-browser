@@ -21,8 +21,8 @@ release actual. Cada etapa tiene una salida verificable antes de abrir la siguie
 Convertir Overrun en un analizador de tráfico web autorizado, empezando por el
 interceptor CDP `Fetch`. No incorpora un proxy MITM de inicio.
 
-**Estado (2026-09-17):** 2.0 y 2.1 implementadas (panel Security en el overlay, reglas
-locales y auditoría). 2.2 en adelante, sin empezar.
+**Estado (2026-09-17):** 2.0 y 2.1 implementadas y verificadas en la app (panel Security
+en el overlay, reglas locales y auditoría). 2.2 en adelante, sin empezar.
 
 ### Fase 2.0: Fundaciones de seguridad
 
@@ -44,19 +44,21 @@ locales y auditoría). 2.2 en adelante, sin empezar.
 - La lógica pura (redacción, reglas) vive en `src/shared/security.ts`: el renderer valida
   con el mismo código que aplica el main y las pruebas corren sin Electron.
 
-**Pruebas:** ✓ redacción de headers y bodies, validación y matching de reglas
-(`src/shared/security.test.ts`, en CI). ☐ normalización por fixture CDP de
-`Fetch.requestPaused` y activación/desactivación durante requests concurrentes.
+**Pruebas:** ✓ unitarias de redacción, validación y matching de reglas
+(`src/shared/security.test.ts`) y smoke en Electron contra un servidor local
+(`src/main/security.smoke.cjs`), que verifica end-to-end que `Authorization` y
+`X-Api-Key` llegan redactados al renderer mientras el servidor recibe el header
+original. Ambas en CI. ☐ activación/desactivación durante requests concurrentes.
 
 ### Fase 2.1: Mini-Burp con CDP Fetch (REQ-040)
 
 **Salida:** pausar, revisar, continuar, editar, responder o bloquear tráfico de la
-pestaña activa. **Estado: implementada**, pendiente de verificación manual contra un
-servidor de prueba.
+pestaña activa. **Estado: implementada y verificada** en la app contra un servidor
+local (`src/main/security.smoke.cjs`, en CI).
 
 | # | Diseño | Estado | Notas |
 |---|---|---|---|
-| 1 | `Fetch.enable` solo para patrones seleccionados, atado a la pestaña activa | ✓ | Los patrones se derivan de las reglas (`ruleUrlPatterns`); sin reglas el scope es `*`. Al cambiar de pestaña, `attachCdp.dispose()` libera la cola |
+| 1 | `Fetch.enable` solo para patrones seleccionados, atado a la pestaña activa | ✓ | Los patrones se derivan de las reglas (`ruleUrlPatterns`); sin reglas el scope es `*`. El glob de CDP no expresa sufijos de dominio ni puerto con precisión, así que el filtro fino es `matchRule` y lo que ninguna regla selecciona se continúa sin pausar. Al cambiar de pestaña, `attachCdp.dispose()` libera la cola |
 | 2 | `Fetch.requestPaused` → `security.intercepted` | ✓ | Descarta URLs no http(s) |
 | 3 | Cola con límite y timeout seguro | ✓ | 50 pendientes, 15 s; al vencer continúa la petición y deja constancia (`timed-out`) |
 | 4 | Inspector: URL, método, headers, body, respuesta y diff | Parcial | Editor de URL/método/headers/body. Sin vista de respuesta: solo se intercepta `requestStage: Request` |
@@ -67,12 +69,25 @@ servidor de prueba.
 header RFC-compatibles, tope de body y de cantidad de headers, status 100–599. El
 renderer solo manda texto; el main nunca lo evalúa.
 
-**Criterios de aceptación** — ☐ pendientes de correr a mano contra un servidor de prueba:
+**Criterios de aceptación** — ✓ automatizados en `src/main/security.smoke.cjs`:
 
-- ☐ Editar query/header/body de una petición y verificar que el servidor recibe el cambio.
-- ☐ Bloquear un recurso y mostrar causa y regla aplicada.
-- ☐ Desactivar el modo y comprobar que no quedan requests pausados.
-- ☐ Navegar/cerrar pestaña durante una pausa sin fuga de listeners ni bloqueo.
+- ✓ Editar query y header de una petición: el servidor recibe `?mod=1` y el header agregado.
+- ✓ Bloquear un recurso: la petición falla en la página, no llega al servidor y la
+  auditoría guarda la causa; una regla `block` hace lo mismo sin intervención y deja `ruleId`.
+- ✓ Desactivar el modo: la cola queda en cero, las peticiones en espera se liberan y
+  el tráfico posterior pasa normal.
+- ✓ Navegar y cerrar pestaña durante una pausa: el documento se intercepta como
+  cualquier petición (igual que en Burp) y al continuarlo la navegación termina; la
+  petición pendiente de la página anterior se resuelve y no queda estado colgado.
+- ✓ Extra: respuesta simulada (`fulfillRequest`) que la página recibe sin que el
+  servidor vea la petición, y scope recortado por reglas.
+
+**Hallazgos de la verificación** (corregidos):
+
+- `Fetch.continueRequest` y `fulfillRequest` esperan los headers como lista de
+  `{name, value}` y el body en base64; pasarlos como objeto devolvía `Invalid parameters`.
+  El interceptor nunca había sido ejercitado contra CDP real.
+- El `urlPattern` derivado de una regla debe tolerar el puerto (`*://host*/path*`).
 
 **Fuera de alcance:** TLS interception, tráfico de extensiones/otras apps,
 WebSocket frames modificables y proxy de sistema.
@@ -184,7 +199,7 @@ origen, modelo y estimación de coste.
 | Hito | Dependencia | Gate de salida |
 |---|---|---|
 | 2.0 | v1 estable | auditoría/redacción probadas — **implementado**, falta fixture CDP |
-| 2.1 | 2.0 | no hay requests huérfanos ni bypass de permiso — **implementado**, falta verificación manual |
+| 2.1 | 2.0 | no hay requests huérfanos ni bypass de permiso — **cumplido**, smoke en Electron dentro de CI |
 | 2.2 | 2.1 | hallazgos explicables y exportables |
 | 2.3 | métricas reales de necesidad | threat model aprobado |
 | 2.4 | paralelo | hardening y SBOM en CI |

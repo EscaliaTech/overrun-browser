@@ -14,6 +14,10 @@ import {
 export const SECURITY_TIMEOUT_MS = 15_000
 export const SECURITY_MAX_PENDING = 50
 
+/** CDP espera headers como lista de entradas y el body en base64. */
+const headerEntries = (headers: Record<string, string>): { name: string; value: string }[] =>
+  Object.entries(headers).map(([name, value]) => ({ name, value }))
+
 interface PendingRequest {
   id: string
   method: string
@@ -101,7 +105,7 @@ export class SecurityInterceptor {
         await this.command('Fetch.fulfillRequest', {
           requestId: request.id,
           responseCode: status,
-          responseHeaders: Object.entries(headers).map(([name, value]) => ({ name, value })),
+          responseHeaders: headerEntries(headers),
           body: Buffer.from(body, 'utf8').toString('base64')
         })
         this.finish(request, 'fulfilled', `Respuesta simulada por el usuario (${status}).`)
@@ -114,7 +118,10 @@ export class SecurityInterceptor {
           (postData !== undefined && (typeof postData !== 'string' || postData.length > SECURITY_MAX_BODY_BYTES))) {
           return { ok: false, state: this.state(), error: 'Los cambios no superan la validación local.' }
         }
-        await this.command('Fetch.continueRequest', { requestId: request.id, url, method, headers, postData })
+        await this.command('Fetch.continueRequest', {
+          requestId: request.id, url, method, headers: headerEntries(headers),
+          ...(postData === undefined ? {} : { postData: Buffer.from(postData, 'utf8').toString('base64') })
+        })
         this.finish({ ...request, url, method, headers, postData }, 'modified', 'Modificada por el usuario.')
       }
       this.message = undefined
@@ -151,6 +158,13 @@ export class SecurityInterceptor {
       timer: setTimeout(() => { void this.timeout(id) }, SECURITY_TIMEOUT_MS)
     }
     const rule = matchRule(this.rules, request)
+    // Con reglas activas, lo que ninguna seleccionó sigue de largo: el scope de
+    // `Fetch.enable` es más laxo que el matcher y no debe pausar de más.
+    if (this.rules.length > 0 && !rule) {
+      clearTimeout(request.timer)
+      void this.command('Fetch.continueRequest', { requestId: id }).catch(() => { /* request ya cancelada */ })
+      return
+    }
     if (rule && rule.mode !== 'pause') {
       clearTimeout(request.timer)
       void this.applyRule(request, rule)
@@ -173,7 +187,7 @@ export class SecurityInterceptor {
       if (rule.mode === 'rewrite') {
         const url = rule.redirectTo ?? request.url
         const headers = { ...request.headers, ...(rule.setHeaders ?? {}) }
-        await this.command('Fetch.continueRequest', { requestId: request.id, url, headers })
+        await this.command('Fetch.continueRequest', { requestId: request.id, url, headers: headerEntries(headers) })
         this.emit({ ...request, url, headers }, 'modified', `Reescrita por la regla ${rule.id}.`, rule.id)
         return
       }

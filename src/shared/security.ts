@@ -120,12 +120,15 @@ export function matchRule(rules: SecurityRule[], request: { url: string; method:
 
 /**
  * Patrones para `Fetch.enable`: sin reglas se intercepta todo (pausa manual);
- * con reglas solo se pausa el tráfico que alguna regla seleccionó (spec 2.1.1).
+ * con reglas, el scope se recorta al tráfico seleccionado (spec 2.1.1).
+ *
+ * El comodín después del host cubre el puerto (`host:8080`). Los hosts con
+ * comodín caen a `*` porque el glob de CDP no expresa sufijos de dominio; el
+ * filtro fino lo hace `matchRule`, y lo que no matchea ninguna regla se continúa
+ * sin pausar. ponytail: si el costo de interceptar de más se nota, acotar por
+ * dominio raíz.
  */
 export function ruleUrlPatterns(rules: SecurityRule[]): string[] {
-  if (rules.length === 0) return ['*']
-  const patterns = rules.map((rule) =>
-    rule.host === '*' ? '*' : `*://${rule.host}${rule.path.startsWith('/') ? rule.path : `/${rule.path}`}*`
-  )
-  return patterns.includes('*') ? ['*'] : [...new Set(patterns)]
+  if (rules.length === 0 || rules.some((rule) => rule.host.includes('*'))) return ['*']
+  return [...new Set(rules.map((rule) => `*://${rule.host}*${rule.path}*`))]
 }

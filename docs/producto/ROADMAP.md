@@ -116,7 +116,8 @@ salto de base se **evalúan según necesidad**, no de entrada.
 **Hecho cuando:** interceptás y modificás el tráfico de una app y el panel Security muestra
 hallazgos. **Estado:** fases 2.0 y 2.1 implementadas (panel Security, permiso explícito, cola con
 timeout, acciones continue/modify/fulfill/block, reglas por host/path/método y auditoría
-exportable); falta la verificación manual de los criterios y las fases 2.2–2.4.
+exportable), con los criterios de aceptación verificados por un smoke en Electron dentro de CI;
+faltan las fases 2.2–2.4.
 
 Diseño de fases, threat model operativo y criterios de aceptación:
 [`V2-V3-ESPECIFICACION.md`](V2-V3-ESPECIFICACION.md).

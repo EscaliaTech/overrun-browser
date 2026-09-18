@@ -48,7 +48,9 @@ describe('reglas por host/path/metodo (fase 2.1)', () => {
       { host: 'api.example.com', path: '/v1', mode: 'observe' },
       { host: 'api.example.com', path: '/v1', method: 'POST', mode: 'block' }
     ])
-    assert.deepEqual(ruleUrlPatterns(rules), ['*://api.example.com/v1*'])
+    // El comodín tras el host cubre el puerto: *://api.example.com:8443/v1/x matchea.
+    assert.deepEqual(ruleUrlPatterns(rules), ['*://api.example.com*/v1*'])
     assert.deepEqual(ruleUrlPatterns(parseRules([{ host: '*', mode: 'pause' }, { host: 'a.com', mode: 'block' }])), ['*'])
+    assert.deepEqual(ruleUrlPatterns(parseRules([{ host: '*.example.com', mode: 'observe' }])), ['*'])
   })
 })
