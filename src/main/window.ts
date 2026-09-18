@@ -441,8 +441,16 @@ export function createWindow(): void {
     // Sin barra de título nativa: el chrome propio llega hasta el borde superior
     // (BRANDING). Los controles nativos min/max/cerrar se dibujan como overlay
     // sobre el tab strip (alto 40); ese strip es la zona de arrastre de la ventana.
-    titleBarStyle: 'hidden',
-    titleBarOverlay: { color: '#0a0b0d', symbolColor: '#cfd3d9', height: TAB_STRIP_H }
+    //
+    // macOS no soporta `titleBarOverlay`: con la barra oculta, los semáforos
+    // flotan sobre el tab strip y tapan las primeras pestañas. Para desarrollo se
+    // deja la barra de título nativa, que no se superpone con nada.
+    // ponytail: si alguna vez se distribuye a Mac, frameless + trafficLightPosition
+    // y padding izquierdo en el tab strip.
+    ...(process.platform === 'darwin' ? {} : {
+      titleBarStyle: 'hidden' as const,
+      titleBarOverlay: { color: '#0a0b0d', symbolColor: '#cfd3d9', height: TAB_STRIP_H }
+    })
   })
 
   const uiPrefs = { preload: join(__dirname, '../preload/index.js'), sandbox: true, contextIsolation: true }

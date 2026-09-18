@@ -7,7 +7,12 @@ import { createWindow, focusPage } from './window'
 if (is.dev) process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true'
 
 // Sin barra de menú nativa (File/Edit/View…). Overrun usa su propio chrome.
-Menu.setApplicationMenu(null)
+// Excepción macOS: ahí los atajos de edición (Cmd+C/V/X/A/Z) vienen de los roles
+// del menú de aplicación, así que sin menú no se puede ni pegar una URL en la
+// barra de direcciones. Se deja el mínimo: app + edición.
+Menu.setApplicationMenu(process.platform === 'darwin'
+  ? Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }])
+  : null)
 
 // ============================================================================
 // Entry del proceso main de Overrun.
