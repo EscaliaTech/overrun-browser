@@ -62,7 +62,9 @@ export function StoragePanel({ st }: { st: StorageView }): JSX.Element {
       <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10, borderBottom: '1px solid #22262e' }}>
         <div style={{ fontSize: 9, letterSpacing: '0.14em', color: 'var(--mute)' }}>POR TIPO</div>
         {latest.breakdown.length === 0 ? (
-          <span style={{ fontSize: 11, color: 'var(--mute)' }}>Sin datos almacenados en este origen.</span>
+          // `Storage.getUsageAndQuota` no contabiliza cookies y suele reportar 0 en
+          // orígenes que sí tienen datos: no afirmamos que el origen esté vacío.
+          <span style={{ fontSize: 11, color: 'var(--mute)' }}>El motor no reporta uso por tipo en este origen; mirá el detalle de abajo.</span>
         ) : (
           latest.breakdown.map((b) => {
             const pct = latest.usage ? (b.bytes / latest.usage) * 100 : 0
@@ -95,8 +97,10 @@ export function StoragePanel({ st }: { st: StorageView }): JSX.Element {
   )
 }
 
+// Abiertas por defecto: el contenido de estas secciones ES el panel. Colapsadas
+// mostraban solo el contador y parecía que el origen no tenía nada guardado.
 function Section({ title, count, children }: { title: string; count: number; children: ReactNode }): JSX.Element {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(true)
   return (
     <div style={{ borderBottom: '1px solid #1c2027' }}>
       <div onClick={() => setOpen((o) => !o)}
